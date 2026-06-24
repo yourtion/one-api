@@ -1,0 +1,10 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
+  "categories": { "correctness": "error", "suspicious": "warn", "perf": "warn" },
+  "rules": { "no-console": "off" },
+  "overrides": [
+    { "files": ["apps/server/**"], "env": ["node"] },
+    { "files": ["apps/web/**"], "env": ["browser"] },
+    { "files": ["**/*.test.ts"], "rules": { "no-explicit-any": "off" } }
+  ]
+}
