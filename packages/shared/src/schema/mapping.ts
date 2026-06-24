@@ -98,11 +98,10 @@ export function fieldToZod(f: FieldMeta): z.ZodType {
   return f.nullable ? s.nullable() : s;
 }
 
-/** 字段默认值 → SQL 字面量片段 */
+/** 字段默认值 → SQL 字面量片段（null/undefined 视为无默认值，不生成子句） */
 function defaultValueLiteral(f: FieldMeta): string | null {
   const v = f.defaultValue;
-  if (v === undefined) return null;
-  if (v === null) return 'NULL';
+  if (v === undefined || v === null) return null; // 无默认值
   if (f.jsonType === 'boolean') return v ? '1' : '0';
   if (typeof v === 'number') return Number.isFinite(v) ? String(v) : 'NULL';
   if (typeof v === 'string') return `'${v.replace(/'/g, "''")}'`;
