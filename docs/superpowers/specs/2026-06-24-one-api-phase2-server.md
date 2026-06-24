@@ -235,3 +235,8 @@
 - MCP HTTP 端点（Phase 4）
 - SDK / CLI（Phase 5）
 - 静态文件托管实际产物（Phase 3 构建后才有）
+
+## Phase 1 遗留待办（本期需处理）
+
+- **消除 `build` 前置依赖**：Phase 1 中 `@1api/engine` 经 project reference 依赖 `@1api/shared` 的 `dist/`，导致全新 clone 后 `pnpm -r test` / `typecheck` 必须先 `pnpm -r build`。本期应配置 vitest（及 tsx dev）直接走 shared 源码（vite `resolve.alias` 把 `@1api/shared` 指向 `packages/shared/src/index.ts`），做到 `pnpm install && pnpm -r test` 直接可用。详见 overview §8「构建前置」。
+- **`better-sqlite3` 版本**：Phase 1 因 Node v26 环境已将 `better-sqlite3` 从 spec 原定的 `^11` 升至 `^12`（v12.11+ 才有 Node26 预编译）。本期依赖块沿用 `^12`。

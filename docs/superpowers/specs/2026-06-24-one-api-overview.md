@@ -414,3 +414,13 @@ const Errors = {
 
 - 开发：`pnpm dev` 并行启动 server（tsx watch）+ web（vite dev，proxy `/api`）
 - 生产：`pnpm build` → `pnpm start`，单进程托管 web 静态文件 + API + MCP
+
+### 构建前置（Phase 1 遗留待办，Phase 2 修复）
+
+`packages/engine` 的 `tsconfig.json` 通过 project reference 指向 `packages/shared`，typecheck/test 依赖 shared 的构建产物 `dist/`（已 gitignore）。因此 **全新 clone 后直接 `pnpm -r test` / `typecheck` 会失败**，必须先 build：
+
+```bash
+pnpm install && pnpm -r build && pnpm -r test   # 当前正确工作流
+```
+
+**Phase 2 待办**：让 vitest 直接走 shared 源码（vite 路径别名 / `@1api/shared` 指向 `src`），消除 `typecheck`/`test` 对 `build` 的前置依赖，做到 clone 后 `pnpm install && pnpm -r test` 直接可用。
