@@ -10,7 +10,7 @@ import {
 /** FieldMetaInput（建模输入）→ FieldMeta（完整），补齐 sqliteType 与默认标记 */
 export function inputToField(input: FieldMetaInput): FieldMeta {
   const sqliteType = jsonTypeToSqliteType(input.jsonType);
-  return {
+  const field: FieldMeta = {
     name: input.name,
     label: input.label ?? input.name,
     sqliteType,
@@ -21,8 +21,10 @@ export function inputToField(input: FieldMetaInput): FieldMeta {
     isAutoIncrement: input.isAutoIncrement ?? false,
     isHidden: input.isHidden ?? false,
     isReadonly: input.isReadonly ?? false,
-    enumValues: input.enumValues,
   };
+  // exactOptionalPropertyTypes：仅在显式提供时挂载 enumValues
+  if (input.enumValues !== undefined) field.enumValues = input.enumValues;
+  return field;
 }
 
 /** CREATE TABLE（含主键约定 + 可选时间戳），执行后由调用方反射读回 */
