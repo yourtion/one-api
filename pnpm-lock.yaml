@@ -48,6 +48,9 @@ importers:
       '@types/better-sqlite3':
         specifier: ^7.6.0
         version: 7.6.13
+      '@types/debug':
+        specifier: ^4.1.0
+        version: 4.1.13
       supertest:
         specifier: ^7.0.0
         version: 7.2.2
@@ -59,7 +62,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^3.0.0
-        version: 3.2.6(@types/node@26.0.0)(tsx@4.22.4)
+        version: 3.2.6(@types/debug@4.1.13)(@types/node@26.0.0)(tsx@4.22.4)
 
   packages/engine:
     dependencies:
@@ -78,13 +81,13 @@ importers:
         version: 7.6.13
       '@vitest/coverage-v8':
         specifier: ^3
-        version: 3.2.6(vitest@3.2.6(@types/node@26.0.0)(tsx@4.22.4))
+        version: 3.2.6(vitest@3.2.6(@types/debug@4.1.13)(@types/node@26.0.0)(tsx@4.22.4))
       typescript:
         specifier: ^5.8.0
         version: 5.9.3
       vitest:
         specifier: ^3.0.0
-        version: 3.2.6(@types/node@26.0.0)(tsx@4.22.4)
+        version: 3.2.6(@types/debug@4.1.13)(@types/node@26.0.0)(tsx@4.22.4)
 
   packages/shared:
     dependencies:
@@ -94,13 +97,13 @@ importers:
     devDependencies:
       '@vitest/coverage-v8':
         specifier: ^3
-        version: 3.2.6(vitest@3.2.6(@types/node@26.0.0)(tsx@4.22.4))
+        version: 3.2.6(vitest@3.2.6(@types/debug@4.1.13)(@types/node@26.0.0)(tsx@4.22.4))
       typescript:
         specifier: ^5.8.0
         version: 5.9.3
       vitest:
         specifier: ^3.0.0
-        version: 3.2.6(@types/node@26.0.0)(tsx@4.22.4)
+        version: 3.2.6(@types/debug@4.1.13)(@types/node@26.0.0)(tsx@4.22.4)
 
 packages:
 
@@ -691,6 +694,9 @@ packages:
   '@types/cookie@0.4.1':
     resolution: {integrity: sha512-XW/Aa8APYr6jSVVA1y/DEIZX0/GMKLEVekNG727R8cs56ahETkRAy/3DR7+fJyh7oUgGwNQaRfXCun0+KbWY7Q==}
 
+  '@types/debug@4.1.13':
+    resolution: {integrity: sha512-KSVgmQmzMwPlmtljOomayoR89W4FynCAi3E8PPs7vmDVPe84hT+vGPKkJfThkmXs0x0jAaa9U8uW8bbfyS2fWw==}
+
   '@types/deep-eql@4.0.2':
     resolution: {integrity: sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw==}
 
@@ -711,6 +717,9 @@ packages:
 
   '@types/mime@2.0.3':
     resolution: {integrity: sha512-Jus9s4CDbqwocc5pOAnh8ShfrnMcPHuJYzVcSUU7lrh8Ni5HuIqX3oilL86p3dlTrk0LzHRCgA/GQ7uNCw6l2Q==}
+
+  '@types/ms@2.1.0':
+    resolution: {integrity: sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==}
 
   '@types/node@26.0.0':
     resolution: {integrity: sha512-vf2YFi1iY9lHGwNJMs01biZFbKJkrZR1T6/MlzjhJLPdntOHLhTrDSnSVcdtvjihi4VQNlrFRIxLsDBlQpAipA==}
@@ -2180,6 +2189,10 @@ snapshots:
 
   '@types/cookie@0.4.1': {}
 
+  '@types/debug@4.1.13':
+    dependencies:
+      '@types/ms': 2.1.0
+
   '@types/deep-eql@4.0.2': {}
 
   '@types/estree@1.0.9': {}
@@ -2203,6 +2216,8 @@ snapshots:
 
   '@types/mime@2.0.3': {}
 
+  '@types/ms@2.1.0': {}
+
   '@types/node@26.0.0':
     dependencies:
       undici-types: 8.3.0
@@ -2225,7 +2240,7 @@ snapshots:
       '@types/http-errors': 2.0.5
       '@types/node': 26.0.0
 
-  '@vitest/coverage-v8@3.2.6(vitest@3.2.6(@types/node@26.0.0)(tsx@4.22.4))':
+  '@vitest/coverage-v8@3.2.6(vitest@3.2.6(@types/debug@4.1.13)(@types/node@26.0.0)(tsx@4.22.4))':
     dependencies:
       '@ampproject/remapping': 2.3.0
       '@bcoe/v8-coverage': 1.0.2
@@ -2240,7 +2255,7 @@ snapshots:
       std-env: 3.10.0
       test-exclude: 7.0.2
       tinyrainbow: 2.0.0
-      vitest: 3.2.6(@types/node@26.0.0)(tsx@4.22.4)
+      vitest: 3.2.6(@types/debug@4.1.13)(@types/node@26.0.0)(tsx@4.22.4)
     transitivePeerDependencies:
       - supports-color
 
@@ -3318,7 +3333,7 @@ snapshots:
       fsevents: 2.3.3
       tsx: 4.22.4
 
-  vitest@3.2.6(@types/node@26.0.0)(tsx@4.22.4):
+  vitest@3.2.6(@types/debug@4.1.13)(@types/node@26.0.0)(tsx@4.22.4):
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/expect': 3.2.6
@@ -3344,6 +3359,7 @@ snapshots:
       vite-node: 3.2.4(@types/node@26.0.0)(tsx@4.22.4)
       why-is-node-running: 2.3.0
     optionalDependencies:
+      '@types/debug': 4.1.13
       '@types/node': 26.0.0
     transitivePeerDependencies:
       - jiti
