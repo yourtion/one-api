@@ -72,6 +72,12 @@ describe('SchemaService', () => {
         Errors.reservedName('schema'),
       );
     });
+    it('业务库已存在同名表（但未导入）→ TABLE_ALREADY_EXISTS', async () => {
+      dbs.businessRaw.exec('CREATE TABLE existing (id INTEGER PRIMARY KEY)');
+      await expect(
+        svc.createModel({ name: 'existing', label: 'X', fields: [] }),
+      ).rejects.toThrow(Errors.tableAlreadyExists('existing'));
+    });
   });
 
   describe('addField', () => {
@@ -88,6 +94,18 @@ describe('SchemaService', () => {
       await expect(svc.addField('t', { name: 'Age', jsonType: 'integer' })).rejects.toThrow(
         Errors.invalidName('Age'),
       );
+    });
+    it('字段已存在 → VALIDATION_FAIL', async () => {
+      dbs.businessRaw.exec('CREATE TABLE t (id INTEGER PRIMARY KEY)');
+      await svc.importExisting('t');
+      await expect(svc.addField('t', { name: 'id', jsonType: 'integer' })).rejects.toThrow(
+        /VALIDATION_FAIL|字段已存在/,
+      );
+    });
+    it('目标表未导入 → TABLE_NOT_FOUND', async () => {
+      await expect(
+        svc.addField('nope', { name: 'age', jsonType: 'integer' }),
+      ).rejects.toThrow(Errors.tableNotFound('nope'));
     });
   });
 

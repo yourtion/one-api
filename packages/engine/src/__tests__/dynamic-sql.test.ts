@@ -112,6 +112,26 @@ describe('DynamicSql', () => {
       expect((await dyn.selectList(meta(), { filters: { title: ['like', '%a%'] } })).total).toBe(1);
     });
 
+    it('过滤 ne / gte / lt / lte 全覆盖', async () => {
+      // 数据：views = 5,10,10
+      expect((await dyn.selectList(meta(), { filters: { views: ['ne', 5] } })).total).toBe(2);
+      expect((await dyn.selectList(meta(), { filters: { views: ['gte', 10] } })).total).toBe(2);
+      expect((await dyn.selectList(meta(), { filters: { views: ['lt', 10] } })).total).toBe(1);
+      expect((await dyn.selectList(meta(), { filters: { views: ['lte', 5] } })).total).toBe(1);
+    });
+
+    it('不支持的过滤操作符 → VALIDATION_FAIL', async () => {
+      await expect(
+        dyn.selectList(meta(), { filters: { views: ['weird', 1] } }),
+      ).rejects.toThrow(/VALIDATION_FAIL|不支持/);
+    });
+
+    it('in 操作符空值 → VALIDATION_FAIL', async () => {
+      await expect(
+        dyn.selectList(meta(), { filters: { id: ['in', ''] } }),
+      ).rejects.toThrow(/VALIDATION_FAIL|in 操作符值非法/);
+    });
+
     it('q 模糊（TEXT 非主键 OR LIKE）', async () => {
       expect((await dyn.selectList(meta(), { q: 'b' })).total).toBe(1);
     });

@@ -90,6 +90,21 @@ describe('MetadataStore', () => {
     expect(await store.getMetaByName('t')).toBeUndefined();
   });
 
+  it('warmup：从系统库加载已存在的 table_meta 到缓存', async () => {
+    // 先写入一条（绕过 store，直接进库）然后用新 store warmup 读回
+    await store.createMeta({
+      name: 'warm',
+      label: '预热',
+      primaryKey: 'id',
+      fields: [f('id', { isPrimary: true, sqliteType: 'INTEGER', jsonType: 'integer' })],
+    });
+    const store2 = new MetadataStore(dbs.systemDb, dbs.businessRaw);
+    expect(await store2.getMetaByName('warm')).toBeUndefined(); // 新 store 缓存为空
+    await store2.warmup();
+    expect((await store2.getMetaByName('warm'))?.label).toBe('预热');
+    expect((await store2.listMetas()).length).toBeGreaterThan(0);
+  });
+
   describe('refreshMeta diff（保留用户标记）', () => {
     it('保留 label/isHidden/isReadonly/enumValues；结构随反射更新；新增/删除字段同步', async () => {
       // 业务库先建表
