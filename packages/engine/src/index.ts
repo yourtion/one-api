@@ -1,0 +1,12 @@
+export { DataEngine, createEngine } from './engine.js';
+export type { CreateEngineOptions } from './engine.js';
+export { SchemaService } from './schema-service.js';
+export { DataService } from './data-service.js';
+export type { DataServiceOptions } from './data-service.js';
+export { MetadataStore } from './metadata.js';
+export type { CreateMetaInput } from './metadata.js';
+export { DynamicSql, assertFieldExists, normalizeDatetime } from './dynamic-sql.js';
+export { readTableSchema, listTables } from './schema-reader.js';
+export { createTable, addColumn, inputToField } from './schema-ddl.js';
+export type { SystemDB, TableMetaRow } from './system-db.js';
+export { SYSTEM_DB_MIGRATIONS } from './system-db.js';
