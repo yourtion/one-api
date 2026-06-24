@@ -44,16 +44,16 @@ one-api/
 
 ## 3. 开发命令
 
-**⚠️ 当前正确工作流（Phase 1 遗留，Phase 2 待修）：**
+**当前正确工作流：**
 
 ```bash
 pnpm install
-pnpm -r build      # 必须先 build（生成 shared/dist/，engine 的 project reference 依赖它）
-pnpm -r typecheck  # 否则 typecheck/test 会失败
-pnpm -r test
+pnpm -r test          # ✅ 可直接运行（vite alias 让 vitest 直走 shared 源码，无需先 build）
+pnpm -r build         # typecheck/构建仍需要（tsc 经 project reference 依赖 shared/dist/）
+pnpm -r typecheck
 ```
 
-> 全新 clone 后**不能**直接 `pnpm -r test`——engine 的 tsconfig 用 project reference 指向 shared，依赖 shared 的 `dist/`（已 gitignore）。Phase 2 计划用 vite 别名让 vitest 直走 shared 源码以消除此前置依赖。详见 overview §8。
+> test 已消除 build 前置依赖（vitest 通过 `resolve.alias` 直走 `packages/shared/src`）。typecheck 走 tsc project reference，仍需先 build；这是已知取舍（overview §8）。
 
 **常规命令：**
 
