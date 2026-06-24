@@ -30,8 +30,11 @@
 ### 2.1 server 骨架
 
 **`src/config/index.ts`**
-- 端口（默认 3000）、系统库路径、业务库路径、session 密钥
-- 读取优先级：环境变量 > 默认值（`~/.one-api/` 下）
+- 端口（`PORT`，默认 3000）
+- 系统库路径（`ONE_API_SYSTEM_DB`，默认 `~/.one-api/system.db`）
+- 业务库路径（`ONE_API_BUSINESS_DB`，默认 `~/.one-api/business.db`）—— 单业务库，运行时固定
+- session 密钥（`ONE_API_SESSION_SECRET`，默认随机生成，重启后旧 session 失效）
+- 读取优先级：环境变量 > 默认值
 
 **`src/db/system.ts`** + **`src/db/business.ts`**
 - 工厂函数创建 Kysely 实例（SqliteDialect + better-sqlite3）
@@ -60,14 +63,15 @@
 
 **`session.ts`** —— admin session 鉴权
 - 基于 @leizm/web 原生 session 能力（`component/session` + context `session` getter + cookie/cookie-parser 依赖，框架已内置）
+- session 存于**进程内存**，**进程重启后登录失效，需重新登录**（见 overview §session 存储）
 - `requireAdmin`：校验 session 已登录，否则 401 `AUTH_REQUIRED`
 - SameSite cookie + 同源校验防 CSRF
 - 登录时 `ctx.session.adminId = admin.id`，登出时销毁 session
 
 **`token.ts`** —— API Token 鉴权
-- `requireToken`：解析 `Authorization: Bearer oa_xxx`，查 api_token 表，校验 is_active + 未过期
+- `requireToken`：解析 `Authorization: Bearer oa_xxx`，计算 sha256 后与 api_token.token_hash 比对，校验 is_active + 未过期
 - `checkPermission(table, action)`：校验 token.permissions 的 tables 白名单 + actions 白名单
-- 更新 `last_used_at`
+- 更新 `last_used_at`：**降频**（每 60s 最多写一次，内存记录上次写时间戳），避免高频请求写放大（见 overview §token 使用记录）
 - 失败 → 401/403
 
 **`error.ts`** —— 全局错误处理
@@ -200,7 +204,7 @@
 - data-schema：token schema action 权限；无 schema action → 拒绝
 - **保留表名**（schema/records/incr）导入/新建 → 拒绝
 - **无主键/复合主键表导入** → 拒绝（透传 engine 错误）
-- token：创建返回明文仅一次；后续列表只显示 token_prefix；token_hash 不外泄；sha256 比对鉴权
+- token：创建返回明文仅一次；后续列表只显示 token_prefix；token_hash 不外泄；sha256 比对鉴权；**last_used_at 降频更新（连续请求不每次写库）**
 - 错误信封格式校验
 - 元数据缓存一致性（导入后立即可查）
 

@@ -128,11 +128,12 @@ one-api/
 
 ### 两个 SQLite 文件
 
-| 库 | 默认文件 | 内容 | 谁建表 |
-|---|---|---|---|
-| 系统库 | `~/.one-api/system.db` 或工作目录 `system.db` | 管理员、Token、表元数据 | 系统自动建表 |
-| 业务库 | 用户配置路径（默认 `~/.one-api/business.db`） | 用户业务数据表 | 系统建表 / 用户导入 |
+| 库 | 默认路径 | 内容 | 谁建表 | 配置方式 |
+|---|---|---|---|---|
+| 系统库 | `~/.one-api/system.db`（可被 `ONE_API_SYSTEM_DB` 覆盖） | 管理员、Token、表元数据 | 系统自动建表 | 启动时 |
+| 业务库 | `~/.one-api/business.db`（可被 `ONE_API_BUSINESS_DB` 覆盖） | 用户业务数据表 | 系统建表 / 用户导入 | 启动时 |
 
+- **单业务库**：本期只支持一个业务库，路径启动时配置（环境变量），运行时固定，不支持运行时切换或多库。多业务库留待后期。
 - 启动时若系统库不存在 → 自动建表 + 创建默认管理员（`admin/123456`，首次登录强制改密）
 - 启动时若业务库不存在 → 创建空文件
 - 启动时对业务库连接执行 `PRAGMA journal_mode = WAL`
@@ -243,8 +244,8 @@ interface TableMeta {
   isPublished: boolean;
   isEditable: boolean;
   note: string | null;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: number;      // 毫秒时间戳（系统库 INTEGER）
+  updatedAt: number;
 }
 ```
 
@@ -352,14 +353,27 @@ const Errors = {
 - **系统库**（admin / api_token / table_meta）的 `created_at` / `updated_at` / `expires_at` / `last_used_at` 统一存 **INTEGER 毫秒时间戳**（`Date.now()` / `new Date(ms)` 原生契合，省去字符串解析，整数比较排序）。engine 读写统一用 ms，API 响应可按需转 ISO8601 返回前端。
 - **业务库**不强制时间格式——由 schema-reader 适配用户表字段的实际存储格式（ISO8601 / SQLite 原生 `'YYYY-MM-DD HH:MM:SS'` / Unix 秒 / 毫秒均可识别），读取时按字段实际格式解析，**不向业务表强加约定**。
 
-### 命名
-- 表名：蛇形 `snake_case`，校验合法性（`^[a-z][a-z0-9_]*$`）+ 唯一性
-- 字段名：蛇形 `snake_case`
+### 命名与正则
+- **新建模型/字段**：表名、字段名必须匹配 `^[a-z][a-z0-9_]*$`（小写字母开头，仅小写字母/数字/下划线），并避开保留字（schema/records/incr）。这是系统创建的表，强制规范。
+- **导入已有表**：表名/字段名按 SQLite 实际存储保留，**不强制**正则校验（用户表可能含大写、数字开头、中文等合法字符）。导入时如遇不符合正则的标识符，仍可导入，仅在 engine 动态 SQL 中用双引号包裹标识符（`"TableName"`）安全引用。
 - HTTP API 路径：kebab-case 或路径参数
+
+### 缓存一致性
+- **本期为单进程工具**：元数据内存缓存仅在当前进程内的变更（导入/新建/刷新/删除）时失效，保证单实例强一致。
+- **多进程/多副本/外部修改**（如 CLI 本地直连同时操作业务库、或多副本部署）：缓存不会自动感知外部变更。需调 `POST /api/admin/tables/:id/refresh` 显式刷新，或重启进程。
+- 该限制属 YAGNI 取舍，文档与启动日志明确标注。
 
 ### 鉴权统一
 - 管理界面 + `/api/admin/*`：session（登录建立，SameSite cookie，同源校验防 CSRF）
 - `/api/data/*` + `/api/data/_schema/*` + `/mcp`：`Authorization: Bearer oa_xxx`（Token，permissions 校验）
+
+### session 存储
+- admin session 存于**进程内存**（@leizm/web 原生）。**进程重启后登录失效，需重新登录**；多副本部署不共享 session。
+- 这是 MVP 取舍：admin 是低频操作，重启重登可接受；与一键启动的单进程定位一致。后期如需持久化可迁移到系统库或外部存储。
+
+### token 使用记录（last_used_at）
+- **降频更新**：API/MCP 请求校验 token 时，`last_used_at` 每 60s 最多写一次（内存记录上次写时间戳，未满 60s 跳过写库）。
+- 避免高频 CRUD/MCP 调用下对系统库 api_token 表的写放大（SQLite 单写锁）。准确度足够（last_used_at 仅用于审计参考）。
 
 ### is_published / is_editable 校验边界
 - **对外通道**（`/api/data/*`、`/mcp`）：engine.data 调用强制校验 `is_published`（未发布 → 404）、`is_editable`（写操作 → 403）

@@ -99,7 +99,7 @@
 
 **`src/dynamic-sql.ts`** —— 动态查询（业务库，kysely）
 - 接收 `businessDb: Kysely`
-- 所有表名/列名先经 `assertTableExists(meta, name)` / `assertFieldExists(meta, name)` 白名单校验
+- 所有表名/列名先经 `assertTableExists(meta, name)` / `assertFieldExists(meta, name)` 白名单校验；动态拼标识符时一律用双引号包裹（`"TableName"`），支持导入的非 snake_case 表名/字段名
 - `selectList(meta, opts)`：SELECT + WHERE（filters）+ ORDER + LIMIT/OFFSET + COUNT
 - `selectOne(meta, pk)`：WHERE primaryKey = ?
 - `insertRow(meta, data)`：INSERT 命名字段
@@ -107,19 +107,20 @@
 - `deleteRow(meta, pk)`：DELETE WHERE pk
 - `incrementField(meta, pk, field, n)`：UPDATE SET field = field + n
 - 过滤操作符实现：eq/ne/gt/gte/lt/lte/like（LIKE）/in（拆分逗号）
-- `q` 模糊搜索：所有 TEXT/非主键字段 OR LIKE
+- `q` 模糊搜索：所有 TEXT/非主键字段 OR LIKE `%q%`。**性能边界**：LIKE `%q%` 无法走索引，为全表扫描，仅适合中小数据量（SQLite 单机工具定位）；MVP 不做 FTS/索引优化，文档标注适用数据量上限
 
 **`src/data-service.ts`** —— 高层数据操作（组合 metadata + dynamic-sql）
 - 所有方法签名：`(table, ..., options?: { internal?: boolean })`
 - `describe(table, opts)`：返回 TableMeta
 - `list(table, opts)`：`internal` 为 false（默认）→ 校验 is_published；true → 跳过校验
-- `get/create/update/delete/incr`：`internal` 为 false → 写操作校验 is_editable（否则 `TABLE_NOT_EDITABLE`）；true → 跳过
+- `get/create/update/delete`：`internal` 为 false → 写操作校验 is_editable（否则 `TABLE_NOT_EDITABLE`）；true → 跳过
+- `incr(table, pk, field, n, opts)`：**校验 field 的 jsonType 必须为 integer/number**（否则抛 `VALIDATION_FAIL`，禁止对 TEXT 字段自增，避免 SQLite 类型亲和导致 `'5'+3` 拼接）；`internal` 同上
 - 说明：`internal` 仅控制 is_published/is_editable 校验，**不**绕过白名单等注入防护
 
 **`src/schema-service.ts`** —— 高层 schema 操作
-- `importExisting(name)`：listTables 确认存在 → readTableSchema（**无主键/复合主键抛错透传**）→ createMeta（label 留空待填）
-- `createModel(opts)`：createTable（DDL）→ readTableSchema（读回真实结构）→ createMeta
-- `addField(table, field)`：addColumn（DDL）→ refreshMeta
+- `importExisting(name)`：listTables 确认存在 → readTableSchema（**无主键/复合主键抛错透传**）→ createMeta（label 留空待填）。导入表名**不强制**正则，按 SQLite 实际表名保留
+- `createModel(opts)`：opts.name **必须**匹配 `^[a-z][a-z0-9_]*$` 且非保留字 → createTable（DDL）→ readTableSchema（读回真实结构）→ createMeta
+- `addField(table, field)`：field.name 同样强制正则 → addColumn（DDL）→ refreshMeta
 - `refresh(table)`：refreshMeta
 
 **`src/engine.ts`** —— DataEngine 装配
@@ -143,6 +144,8 @@ export class DataEngine {
 - schema-reader：**无主键表 → TABLE_NO_PRIMARY_KEY；复合主键表 → TABLE_COMPOSITE_PRIMARY_KEY**
 - data-service：datetime 字段多格式读取（ISO8601 / SQLite 原生 / Unix 秒 / 毫秒 / 无法解析原样返回）
 - dynamic-sql：CRUD + 每个过滤操作符 + 排序 + 分页 + incr + 白名单拒绝
+- data-service incr：对 TEXT 字段自增 → `VALIDATION_FAIL`；对 integer 字段自增正常
+- schema-service createModel：非法表名（大写/数字开头/保留字）→ 拒绝；importExisting 非正则表名 → 允许
 - metadata：CRUD + refresh diff（用户标记保留）
 - data-service：默认（is_published/is_editable 约束生效）+ `internal:true`（约束跳过）
 - schema-service：导入/新建/addField/refresh 完整流程
