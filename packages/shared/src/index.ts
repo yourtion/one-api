@@ -2,3 +2,4 @@
 export const __SHARED_VERSION = '0.0.0';
 
 export * from './constants.js';
+export * from './errors.js';
