@@ -1,10 +1,12 @@
 # Phase 4：MCP 服务（AI native）
 
-> 所属：one-api ｜ 前置：Phase 1（engine）｜ 成果：AI agent 连 /mcp 读写数据、自主建表
+> 所属：one-api ｜ 前置：Phase 1（engine）+ Phase 2（token 鉴权与路由装配）｜ 成果：AI agent 连 /mcp 读写数据、自主建表
 
 ## 目标
 
 在 `apps/server` 内增加 `/mcp` HTTP 端点（Streamable HTTP transport），将 DataEngine 的能力暴露为 MCP tools。AI agent 连接该端点即可：理解表结构、读写数据、自主建表/加字段。
+
+**前置依赖说明**：MCP 复用 Phase 2 的 token 鉴权（requireToken/checkPermission）和 @leizm/web 路由装配，**必须等 Phase 2 完成后才能开工**，不可与 Phase 2 并行。
 
 **本期只做内嵌 HTTP MCP，不做 stdio/npx 形态**（CLI 是 Phase 5 的独立产物）。MCP 复用与 HTTP API 相同的 Token 鉴权体系。
 
@@ -59,7 +61,9 @@
 | `add_field` | `{ table, field: FieldMetaInput }` | `engine.schema.addField(table, field)` | schema |
 
 - 要求 token permissions 含 `schema` action，且 tables 覆盖目标表（create_table 时 tables 含 `*` 或新表名）
-- field 入参复用 `@one-api/shared` 的 `FieldMetaInput` 类型 + 校验（表名/字段名正则）
+- field 入参复用 `@1api/shared` 的 `FieldMetaInput` 类型 + 校验（表名/字段名正则）
+- **保留表名**（schema/records/incr）作为 create_table 的 name → 拒绝（与 HTTP API 一致）
+- 与 Phase 2 的 `/api/data/_schema/*` HTTP API 完全对称（同 engine 调用、同权限校验）
 
 ### 4.4 鉴权与权限（`auth.ts`）
 

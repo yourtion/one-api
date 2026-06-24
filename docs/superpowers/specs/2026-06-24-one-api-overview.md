@@ -63,7 +63,7 @@ one-api/
 │   │   │   │   └── mcp/              # MCP HTTP 端点（/mcp）
 │   │   │   ├── middlewares/          # 鉴权/静态文件/CORS/错误处理
 │   │   │   └── utils/
-│   │   └── package.json              # 依赖 @one-api/engine @one-api/shared
+│   │   └── package.json              # 依赖 @1api/engine @1api/shared
 │   │
 │   └── web/                    # 管理界面（可运行）
 │       ├── src/
@@ -73,7 +73,7 @@ one-api/
 │       │   ├── stores/               # Pinia
 │       │   └── main.ts
 │       ├── vite.config.ts            # build 产物 → server static 目录
-│       └── package.json              # 依赖 @one-api/shared
+│       └── package.json              # 依赖 @1api/shared
 │
 ├── packages/
 │   ├── shared/                 # 【MVP】前后端共享类型与常量
@@ -81,7 +81,7 @@ one-api/
 │   │   │   ├── types/               # TableMeta / FieldMeta / ApiResponse ...
 │   │   │   ├── schema/              # SQLite↔JSON Schema↔Zod 映射定义
 │   │   │   └── constants.ts         # 角色/动作枚举、API 路径前缀
-│   │   └── package.json             # @one-api/shared
+│   │   └── package.json             # @1api/shared
 │   │
 │   ├── engine/                 # 【MVP】数据引擎（纯逻辑能力层）
 │   │   ├── src/
@@ -91,13 +91,13 @@ one-api/
 │   │   │   ├── schema-ddl.ts        # CREATE/ALTER TABLE
 │   │   │   ├── data-service.ts      # 数据操作：list/get/create/update/delete/incr/describe
 │   │   │   └── schema-service.ts    # schema 操作：createModel/addField/refresh
-│   │   └── package.json             # @one-api/engine
+│   │   └── package.json             # @1api/engine
 │   │
 │   ├── sdk/                    # 【后期】HTTP CRUD 客户端
-│   │   └── package.json             # @one-api/sdk
+│   │   └── package.json             # @1api/sdk
 │   │
 │   └── cli/                    # 【后期】独立终端工具 bin
-│       └── package.json             # @one-api/cli / one-api-cli
+│       └── package.json             # @1api/cli / one-api-cli
 │
 └── docs/
 ```
@@ -142,12 +142,13 @@ one-api/
 **`admin`（管理员）**
 ```sql
 CREATE TABLE admin (
-  id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  name          TEXT NOT NULL UNIQUE,        -- 登录名
-  nickname      TEXT NOT NULL,
-  password_hash TEXT NOT NULL,               -- bcrypt，cost=10
-  created_at    TEXT NOT NULL,               -- ISO8601
-  updated_at    TEXT NOT NULL
+  id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+  name                 TEXT NOT NULL UNIQUE,        -- 登录名
+  nickname             TEXT NOT NULL,
+  password_hash        TEXT NOT NULL,               -- bcrypt，cost=10
+  must_change_password INTEGER NOT NULL DEFAULT 0,  -- 1=下次登录强制改密（默认 admin 初次为 1）
+  created_at           TEXT NOT NULL,               -- ISO8601
+  updated_at           TEXT NOT NULL
 );
 ```
 
@@ -156,7 +157,8 @@ CREATE TABLE admin (
 CREATE TABLE api_token (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   name         TEXT NOT NULL,                -- 备注
-  token        TEXT NOT NULL UNIQUE,         -- 形如 oa_xxxxxxxx（随机不可逆存储）
+  token_hash   TEXT NOT NULL UNIQUE,         -- sha256(原 token)，仅存哈希
+  token_prefix TEXT NOT NULL,                -- 前缀用于列表展示，如 oa_a3f9****
   permissions  TEXT NOT NULL,                -- JSON，见下
   is_active    INTEGER NOT NULL DEFAULT 1,
   expires_at   TEXT,                         -- 可选，ISO8601
@@ -165,6 +167,10 @@ CREATE TABLE api_token (
   updated_at   TEXT NOT NULL
 );
 ```
+
+- Token 生成：`oa_` + 32 字节随机 hex；存储 `sha256(原 token)` 到 `token_hash`，存前 8 位 + `****` 到 `token_prefix` 供列表展示
+- 创建时原 token 明文**仅返回一次**；后续无法找回（忘记只能重建）
+- 鉴权时对请求的 Bearer token 计算 sha256 与 `token_hash` 比对
 
 `permissions` JSON 结构：
 ```json
@@ -192,6 +198,13 @@ CREATE TABLE table_meta (
 ```
 
 字段元数据以 JSON 整体存在 `fields` 列（字段总是随表一起读，无需 join；数量小；修改整体替换最简单）。
+
+**主键约束**：`primary_key` 是单字段。导入已有表时：
+- **单主键表**：正常导入
+- **无主键表**：拒绝导入，报错提示「该表无主键，无法导入」
+- **复合主键表**：拒绝导入，报错提示「复合主键暂不支持」
+
+理由：engine 的 CRUD（get/update/delete）依赖单一主键寻址，本期不支持 rowid 兜底或复合 key（YAGNI）。被拒表可让用户先加单主键列再导入。
 
 ## 5. 核心数据结构（`packages/shared`）
 
@@ -241,15 +254,31 @@ interface TableMeta {
 
 | SQLite 类型 | jsonType | JSON Schema（vue-json-ui-editor） | Zod（node-erest 校验） |
 |---|---|---|---|
-| INTEGER | integer | `{type:"integer"}` | `z.coerce.number().int()` |
-| INTEGER | boolean | `{type:"boolean"}` | `z.coerce.boolean()` |
-| REAL | number | `{type:"number"}` | `z.coerce.number()` |
+| INTEGER | integer | `{type:"integer"}` | `coerceInt`（见下） |
+| INTEGER | boolean | `{type:"boolean"}` | `coerceBool`（见下） |
+| REAL | number | `{type:"number"}` | `coerceNum`（见下） |
 | TEXT | string | `{type:"string"}` | `z.string()` |
 | TEXT | datetime | `{type:"string",format:"date-time"}` | `z.string().datetime()` |
 | TEXT + enum | string | `{type:"string",enum:[...]}` | `z.string().enum([...])` |
+| NUMERIC | number | `{type:"number"}` | `coerceNum`（见下） |
 | BLOB | — | 不支持编辑（只读/隐藏） | 不接受输入 |
 
-> 用 `coerce` 是因为 URL query/JSON body 传来的都是字符串，需自动转换。
+> URL query/JSON body 传来的都是字符串，需自动转换。但因 Zod 的 `z.coerce.boolean()` 基于 JS truthiness（`"false"` 是 truthy → 会被转成 `true`），**禁止使用** `z.coerce.boolean()`。改用 `packages/shared` 定义的共享 parser：
+
+```ts
+// packages/shared/src/schema/parsers.ts —— 三端共用的严格转换器
+export const coerceBool = z.union([z.boolean(), z.string(), z.number()])
+  .transform((v) => {
+    if (typeof v === 'boolean') return v;
+    if (v === 'true' || v === 1 || v === '1') return true;
+    if (v === 'false' || v === 0 || v === '0') return false;
+    throw new Error(`无法解析为布尔值: ${v}`);
+  });
+export const coerceInt = z.coerce.number().int();
+export const coerceNum = z.coerce.number();
+```
+
+`coerceBool` 只接受 `true/false/1/0`（及字符串形式），其他值报错——避免 `"false"` 被误存为 true。
 
 ### 统一响应信封
 
@@ -313,7 +342,7 @@ const Errors = {
 | 4 | MCP 服务 | `apps/server` 内 `/mcp` 端点 | AI agent 连 /mcp 读写数据、自主建表 |
 | 5 | SDK + CLI | `packages/sdk` + `packages/cli` | 程序化调用 + 人类终端操作 |
 
-**依赖关系**：Phase 1 是地基；Phase 2/3/4 都依赖 Phase 1；Phase 4（MCP）只依赖 engine，理论上可与 Phase 2/3 并行，但放在后面符合「先核心后增强」。Phase 5 依赖 Phase 2（sdk 走 HTTP）和 Phase 1（cli 本地直连用 engine）。
+**依赖关系**：Phase 1 是地基；Phase 2/3 都依赖 Phase 1；Phase 4（MCP）**依赖 Phase 1 + Phase 2**（复用 token 鉴权与路由装配，不可与 Phase 2 并行）；Phase 5 依赖 Phase 2（sdk 走 HTTP）和 Phase 1（cli 本地直连用 engine）。
 
 详见各 phase spec。
 
@@ -329,15 +358,20 @@ const Errors = {
 
 ### 鉴权统一
 - 管理界面 + `/api/admin/*`：session（登录建立，SameSite cookie，同源校验防 CSRF）
-- `/api/data/*` + `/mcp`：`Authorization: Bearer oa_xxx`（Token，permissions 校验）
+- `/api/data/*` + `/api/data/_schema/*` + `/mcp`：`Authorization: Bearer oa_xxx`（Token，permissions 校验）
+
+### is_published / is_editable 校验边界
+- **对外通道**（`/api/data/*`、`/mcp`）：engine.data 调用强制校验 `is_published`（未发布 → 404）、`is_editable`（写操作 → 403）
+- **管理通道**（`/api/admin/*`）：engine.data 调用传 `internal: true`，**跳过** `is_published`/`is_editable` 校验（管理员可浏览/编辑未发布表）
+- 实现：engine.data 的方法增加 `options?: { internal?: boolean }` 参数；admin 模块传 `internal:true`，对外模块和 MCP 不传（默认 false）
 
 ### 安全要点
 | 风险 | 措施 |
 |---|---|
 | SQL 注入 | 表名/列名白名单校验（命中 FieldMeta）+ kysely 参数化值 |
-| 越权访问 | handler 查 table_meta，未发布表 404；token permissions 校验 |
-| Token 泄露 | 创建明文仅返回一次，存储随机不可逆 |
-| 弱密码 | 首登强制改密；bcrypt cost=10 |
+| 越权访问 | 对外 handler 查 table_meta，未发布表 404；token permissions 校验 |
+| Token 泄露 | 仅存 sha256(原 token)；创建时明文仅返回一次；列表仅展示 token_prefix |
+| 弱密码 | must_change_password 标记，首登强制改密；bcrypt cost=10 |
 | CSRF | admin API 同源校验 / SameSite cookie |
 | 路径遍历 | 业务库路径仅运行时配置，不接受 API 修改 |
 

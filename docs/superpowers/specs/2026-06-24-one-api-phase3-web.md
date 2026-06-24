@@ -16,7 +16,7 @@
 - [ ] Token 管理：创建（明文仅显示一次）/ 启停 / 编辑 permissions
 - [ ] 管理员管理：列表 / 新建 / 改密 / 删除
 - [ ] 响应式适配（桌面优先，移动端基本可用）
-- [ ] 类型与 API 封装复用 `@one-api/shared`
+- [ ] 类型与 API 封装复用 `@1api/shared`
 
 ## 页面结构
 
@@ -40,7 +40,7 @@
 
 **`vite.config.ts`**
 - Vue 插件 + element-plus 自动按需导入
-- `build.outDir` → `../apps/server/static/admin`（相对 workspace）
+- `build.outDir` → `path.resolve(__dirname, '../server/static/admin')`（注意：从 `apps/web` 出发是 `../server/`，不是 `../apps/server/`）
 - dev 模式 `server.proxy`：`/api` → `http://localhost:3000`
 - base: `/admin/`（生产由 server 托管在该路径）
 
@@ -54,7 +54,7 @@
 
 - `request.ts`：fetch/axios 封装，统一信封解包、错误码提示、session cookie 携带
 - `auth.ts` / `table.ts` / `admin-data.ts` / `token.ts` / `admin.ts`：各模块 API 方法
-- 类型从 `@one-api/shared` 导入
+- 类型从 `@1api/shared` 导入
 
 ### 3.3 vue-json-ui-editor 的两处核心用途
 
@@ -148,7 +148,7 @@ FieldMeta[]（table store）──shared 类型映射──→ JSON Schema
 ```jsonc
 // apps/web
 { "dependencies": {
-    "@one-api/shared": "workspace:*",
+    "@1api/shared": "workspace:*",
     "vue": "^3.5",
     "vue-router": "^4",
     "pinia": "^2",

@@ -5,15 +5,15 @@
 ## 目标
 
 实现两个独立产物：
-1. **`packages/sdk`**（`@one-api/sdk`）—— HTTP CRUD 客户端，供 web 内部、cli 远程模式、外部程序消费
+1. **`packages/sdk`**（`@1api/sdk`）—— HTTP CRUD 客户端，供 web 内部、cli 远程模式、外部程序消费
 2. **`packages/cli`**（`one-api-cli`，独立 bin）—— 人类终端操作工具，类似飞书 CLI
 
 **两者完全独立**，cli 不是 MCP 的封装，不服务 agent；sdk 也不是 MCP 客户端。
 
 ## 验收标准
 
-- [ ] `@one-api/sdk`：`createClient(baseUrl, token)` 返回 typed 客户端，覆盖 `/api/data/*` 全部操作
-- [ ] `@one-api/sdk`：可独立发布到 npm，前端/Node 程序可直接引用
+- [ ] `@1api/sdk`：`createClient(baseUrl, token)` 返回 typed 客户端，覆盖 `/api/data/*` 全部操作
+- [ ] `@1api/sdk`：可独立发布到 npm，前端/Node 程序可直接引用
 - [ ] `one-api-cli`：`one-api-cli connect` 连接 server（远程模式）
 - [ ] `one-api-cli`：tables / describe / list / get / create / update / delete / export / import / tables create / add-field 子命令
 - [ ] `one-api-cli`：本地直连模式（`--db path`，不经 HTTP）
@@ -23,7 +23,7 @@
 
 ## 工作项
 
-### 5.1 `packages/sdk`（`@one-api/sdk`）
+### 5.1 `packages/sdk`（`@1api/sdk`）
 
 **定位**：node-erest 的自动 SDK 生成器是给编译期定义的 API 用的；动态表 API 是运行时的，需要一个通用动态客户端。
 
@@ -32,6 +32,7 @@
 export function createClient(baseUrl: string, token: string): OneApiClient;
 
 interface OneApiClient {
+  // 数据 CRUD（走 /api/data/*）
   describe(table): Promise<TableMeta>;
   list(table, opts?): Promise<ListResult>;
   get(table, pk): Promise<Row>;
@@ -39,21 +40,28 @@ interface OneApiClient {
   update(table, pk, data): Promise<Row>;
   delete(table, pk): Promise<void>;
   incr(table, pk, field, count?): Promise<Row>;
+  // Schema 演进（走 /api/data/_schema/*，需 token 含 schema action）
+  schema: {
+    createTable(opts: CreateModelOptions): Promise<TableMeta>;
+    addField(table, field): Promise<TableMeta>;
+  };
 }
 ```
 
 - 基于 fetch（Node 18+ 原生），零额外依赖
+- 数据方法对应 Phase 2 的 `/api/data/:table(/records/:pk|/incr|/schema)` 路由
+- schema 方法对应 Phase 2 的 `/api/data/_schema/*`（token 须含 schema action）
 - 统一信封解包（`{success, data}` → data；`{success:false, error}` → throw）
-- 类型从 `@one-api/shared` 导入
+- 类型从 `@1api/shared` 导入
 - 错误抛 `OneApiError`（含 code/statusCode）
 
-**测试**：mock fetch，校验请求路径/body/响应解析；集成测试连临时 server。
+**测试**：mock fetch，校验请求路径/body/响应解析（含 schema 方法）；集成测试连临时 server。
 
 ### 5.2 `packages/cli`（`one-api-cli`）
 
 **定位**：独立终端工具，人类操作。两种连接模式：
-- **远程模式**（默认）：`one-api-cli connect --host http://... --token oa_xxx`，走 `@one-api/sdk`
-- **本地直连模式**：`one-api-cli connect --db /path/to/business.db`，直接用 `@one-api/engine`
+- **远程模式**（默认）：`one-api-cli connect --host http://... --token oa_xxx`，走 `@1api/sdk`
+- **本地直连模式**：`one-api-cli connect --db /path/to/business.db`，直接用 `@1api/engine`
 
 **技术栈**：commander（参数）+ @inquirer/prompts（交互确认）+ cli-table3（表格输出）。
 
@@ -95,14 +103,14 @@ one-api-cli config                                        # 查看/编辑连接�
 
 ```jsonc
 // packages/sdk
-{ "dependencies": { "@one-api/shared": "workspace:*" },
+{ "dependencies": { "@1api/shared": "workspace:*" },
   "devDependencies": { "typescript": "^5.8", "vitest": "^3" } }
 
 // packages/cli
 { "dependencies": {
-    "@one-api/shared": "workspace:*",
-    "@one-api/sdk": "workspace:*",
-    "@one-api/engine": "workspace:*",
+    "@1api/shared": "workspace:*",
+    "@1api/sdk": "workspace:*",
+    "@1api/engine": "workspace:*",
     "commander": "^12",
     "@inquirer/prompts": "^7",
     "cli-table3": "^0.6"

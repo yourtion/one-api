@@ -31,7 +31,7 @@
 - `tsconfig.base.json`：strict，target ES2022，module NodeNext
 - `oxlint.config.json`：TS 规则，按目录覆盖 node/vue 规则
 - `.gitignore` / `.npmrc`
-- 各包 `package.json`：名称 `@one-api/shared` / `@one-api/engine`，type module，exports 配置
+- 各包 `package.json`：名称 `@1api/shared` / `@1api/engine`，type module，exports 配置
 
 ### 1.2 `packages/shared`
 
@@ -58,10 +58,15 @@
 - `fieldToZod(field: FieldMeta)`：FieldMeta → Zod schema（供 node-erest 校验）
 - `buildCreateColumnSql(field: FieldMeta)`：FieldMeta → `CREATE TABLE` 的列定义片段
 
+**`src/schema/parsers.ts`** —— 共享严格转换器（见 overview §5）
+- `coerceBool` / `coerceInt` / `coerceNum`：`fieldToZod` 内部使用，替代 `z.coerce.boolean()`（禁止使用，`"false"` truthiness 问题）
+- 单独导出供 server/web 直接复用
+
 **`src/index.ts`**：统一导出
 
 **测试** `src/**/*.test.ts`：
-- 映射函数三端一致性（每个 SQLite 类型 + 每个操作符）
+- 映射函数三端一致性（**每个 SQLite 类型含 NUMERIC、REAL** + 每个操作符）
+- `coerceBool` 严格性（`"false"`→false、`"true"`→true、`"yes"`→报错、`"1"`→true、`1`→true）
 - 校验正则（合法/非法表名）
 - 边界：BLOB 不接受输入、datetime 转换、enum 处理
 
@@ -70,7 +75,11 @@
 **`src/schema-reader.ts`** —— 反射推断
 - `readTableSchema(businessDb: Database, tableName)`：执行 `PRAGMA table_info` + `PRAGMA table_xinfo` + 读 `sqlite_master` → 推断 `FieldMeta[]` + 主键 + 自增
 - `listTables(businessDb)`：`SELECT name FROM sqlite_master WHERE type='table'`
-- 类型推断规则：`INTEGER`→integer（除非默认值是 0/1 且字段名暗示 boolean 如 `is_*`/`has_*` → boolean）、`REAL`→number、`TEXT`→string（除非字段名是 `*_at`/`*_time`/`time`→datetime）
+- **主键策略**：只接受**单主键**。读 `PRAGMA table_info` 的 `pk` 列：
+  - 无主键（所有字段 pk=0）→ 抛 `TABLE_NO_PRIMARY_KEY`
+  - 复合主键（多个字段 pk>0）→ 抛 `TABLE_COMPOSITE_PRIMARY_KEY`
+  - 单主键 → 正常返回
+- 类型推断规则：`INTEGER`→integer（除非默认值是 0/1 且字段名暗示 boolean 如 `is_*`/`has_*` → boolean）、`REAL`/`NUMERIC`→number、`TEXT`→string（除非字段名是 `*_at`/`*_time`/`time`→datetime）
 - 注意：用 better-sqlite3 同步 API（不经 kysely）
 
 **`src/schema-ddl.ts`** —— DDL 生成与执行
@@ -100,13 +109,14 @@
 - `q` 模糊搜索：所有 TEXT/非主键字段 OR LIKE
 
 **`src/data-service.ts`** —— 高层数据操作（组合 metadata + dynamic-sql）
-- `describe(table)`：返回 TableMeta（供 agent/前端理解 schema）
-- `list(table, opts)`：校验 is_published → 查元数据缓存 → dynamic-sql → ListResult
-- `get(table, pk)` / `create(table, row)` / `update(table, pk, patch)` / `delete(table, pk)` / `incr(table, pk, field, n)`
-- 写操作校验 `is_editable`（否则抛 `TABLE_NOT_EDITABLE`）
+- 所有方法签名：`(table, ..., options?: { internal?: boolean })`
+- `describe(table, opts)`：返回 TableMeta
+- `list(table, opts)`：`internal` 为 false（默认）→ 校验 is_published；true → 跳过校验
+- `get/create/update/delete/incr`：`internal` 为 false → 写操作校验 is_editable（否则 `TABLE_NOT_EDITABLE`）；true → 跳过
+- 说明：`internal` 仅控制 is_published/is_editable 校验，**不**绕过白名单等注入防护
 
 **`src/schema-service.ts`** —— 高层 schema 操作
-- `importExisting(name)`：listTables 确认存在 → readTableSchema → createMeta（label 留空待填）
+- `importExisting(name)`：listTables 确认存在 → readTableSchema（**无主键/复合主键抛错透传**）→ createMeta（label 留空待填）
 - `createModel(opts)`：createTable（DDL）→ readTableSchema（读回真实结构）→ createMeta
 - `addField(table, field)`：addColumn（DDL）→ refreshMeta
 - `refresh(table)`：refreshMeta
@@ -119,7 +129,7 @@ export class DataEngine {
     private businessDb: Kysely,              // kysely（查询用）
     private systemDb: Kysely<SystemDB>,      // 元数据
   ) {}
-  data: DataService;     // 数据操作
+  data: DataService;     // 数据操作（含 internal 选项）
   schema: SchemaService; // schema 操作
 }
 ```
@@ -128,10 +138,11 @@ export class DataEngine {
 
 **测试** `src/**/*.test.ts`：
 - 每个测试用 `tmpdir` 下随机 SQLite 文件，afterEach 清理
-- schema-reader：各类 SQLite 类型推断（含 boolean/datetime 启发式）
+- schema-reader：各类 SQLite 类型推断（含 boolean/datetime/NUMERIC 启发式）
+- schema-reader：**无主键表 → TABLE_NO_PRIMARY_KEY；复合主键表 → TABLE_COMPOSITE_PRIMARY_KEY**
 - dynamic-sql：CRUD + 每个过滤操作符 + 排序 + 分页 + incr + 白名单拒绝
 - metadata：CRUD + refresh diff（用户标记保留）
-- data-service：is_published/is_editable 约束
+- data-service：默认（is_published/is_editable 约束生效）+ `internal:true`（约束跳过）
 - schema-service：导入/新建/addField/refresh 完整流程
 - engine 工厂：从路径创建 + 缓存预热
 
@@ -143,7 +154,7 @@ export class DataEngine {
 
 // packages/engine
 { "dependencies": {
-    "@one-api/shared": "workspace:*",
+    "@1api/shared": "workspace:*",
     "kysely": "^0.29",
     "better-sqlite3": "^11",
     "bcrypt": "^5"
