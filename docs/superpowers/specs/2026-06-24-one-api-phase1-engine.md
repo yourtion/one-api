@@ -80,6 +80,7 @@
   - 复合主键（多个字段 pk>0）→ 抛 `TABLE_COMPOSITE_PRIMARY_KEY`
   - 单主键 → 正常返回
 - 类型推断规则：`INTEGER`→integer（除非默认值是 0/1 且字段名暗示 boolean 如 `is_*`/`has_*` → boolean）、`REAL`/`NUMERIC`→number、`TEXT`→string（除非字段名是 `*_at`/`*_time`/`time`→datetime）
+- **datetime 字段读取（业务库，多格式适配）**：业务表的时间字段存储格式不统一，data-service 返回 datetime 字段值时按以下优先级解析：ISO8601（含 `T`/`Z`）→ SQLite 原生 `'YYYY-MM-DD HH:MM:SS'`（按 UTC 拼接 `Z` 解析）→ 纯数字（按 Unix 秒/毫秒启发式，>1e12 视为毫秒，否则秒）→ 解析失败原样返回字符串。**不强加存储格式给业务表**。
 - 注意：用 better-sqlite3 同步 API（不经 kysely）
 
 **`src/schema-ddl.ts`** —— DDL 生成与执行
@@ -87,7 +88,7 @@
 - `addColumn(businessDb, tableName, field)`：`ALTER TABLE ... ADD COLUMN`
 - 列定义生成复用 `shared/schema/mapping.buildCreateColumnSql`
 - 主键约定：默认 `id INTEGER PRIMARY KEY AUTOINCREMENT`（可自定义主键字段）
-- 时间戳约定：`autoTimestamps` 为真 → 加 `created_at TEXT` + `updated_at TEXT`（isReadonly）
+- 时间戳约定：`autoTimestamps` 为真 → 加 `created_at INTEGER` + `updated_at INTEGER`（isReadonly，存毫秒时间戳）。createModel 建表时由 engine 填入 `Date.now()`；update 操作时 engine 刷新 `updated_at`（SQLite 无 `ON UPDATE`，由 engine 层负责）
 
 **`src/metadata.ts`** —— 元数据存储（系统库）
 - 接收 `systemDb: Kysely<SystemDB>`
@@ -140,6 +141,7 @@ export class DataEngine {
 - 每个测试用 `tmpdir` 下随机 SQLite 文件，afterEach 清理
 - schema-reader：各类 SQLite 类型推断（含 boolean/datetime/NUMERIC 启发式）
 - schema-reader：**无主键表 → TABLE_NO_PRIMARY_KEY；复合主键表 → TABLE_COMPOSITE_PRIMARY_KEY**
+- data-service：datetime 字段多格式读取（ISO8601 / SQLite 原生 / Unix 秒 / 毫秒 / 无法解析原样返回）
 - dynamic-sql：CRUD + 每个过滤操作符 + 排序 + 分页 + incr + 白名单拒绝
 - metadata：CRUD + refresh diff（用户标记保留）
 - data-service：默认（is_published/is_editable 约束生效）+ `internal:true`（约束跳过）

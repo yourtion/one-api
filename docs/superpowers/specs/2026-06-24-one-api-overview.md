@@ -147,8 +147,8 @@ CREATE TABLE admin (
   nickname             TEXT NOT NULL,
   password_hash        TEXT NOT NULL,               -- bcrypt，cost=10
   must_change_password INTEGER NOT NULL DEFAULT 0,  -- 1=下次登录强制改密（默认 admin 初次为 1）
-  created_at           TEXT NOT NULL,               -- ISO8601
-  updated_at           TEXT NOT NULL
+  created_at           INTEGER NOT NULL,            -- 毫秒时间戳
+  updated_at           INTEGER NOT NULL
 );
 ```
 
@@ -161,10 +161,10 @@ CREATE TABLE api_token (
   token_prefix TEXT NOT NULL,                -- 前缀用于列表展示，如 oa_a3f9****
   permissions  TEXT NOT NULL,                -- JSON，见下
   is_active    INTEGER NOT NULL DEFAULT 1,
-  expires_at   TEXT,                         -- 可选，ISO8601
-  last_used_at TEXT,
-  created_at   TEXT NOT NULL,
-  updated_at   TEXT NOT NULL
+  expires_at   INTEGER,                      -- 可选，毫秒时间戳
+  last_used_at INTEGER,
+  created_at   INTEGER NOT NULL,
+  updated_at   INTEGER NOT NULL
 );
 ```
 
@@ -192,8 +192,8 @@ CREATE TABLE table_meta (
   is_published INTEGER NOT NULL DEFAULT 1,   -- 是否对外暴露 CRUD/MCP
   is_editable  INTEGER NOT NULL DEFAULT 1,   -- 是否允许写操作
   note         TEXT,
-  created_at   TEXT NOT NULL,
-  updated_at   TEXT NOT NULL
+  created_at   INTEGER NOT NULL,             -- 毫秒时间戳
+  updated_at   INTEGER NOT NULL
 );
 ```
 
@@ -349,7 +349,8 @@ const Errors = {
 ## 8. 全局约定
 
 ### 时间格式
-所有 `created_at` / `updated_at` / `expires_at` 存 ISO8601 字符串（TEXT）。
+- **系统库**（admin / api_token / table_meta）的 `created_at` / `updated_at` / `expires_at` / `last_used_at` 统一存 **INTEGER 毫秒时间戳**（`Date.now()` / `new Date(ms)` 原生契合，省去字符串解析，整数比较排序）。engine 读写统一用 ms，API 响应可按需转 ISO8601 返回前端。
+- **业务库**不强制时间格式——由 schema-reader 适配用户表字段的实际存储格式（ISO8601 / SQLite 原生 `'YYYY-MM-DD HH:MM:SS'` / Unix 秒 / 毫秒均可识别），读取时按字段实际格式解析，**不向业务表强加约定**。
 
 ### 命名
 - 表名：蛇形 `snake_case`，校验合法性（`^[a-z][a-z0-9_]*$`）+ 唯一性
