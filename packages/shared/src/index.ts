@@ -5,3 +5,4 @@ export * from './constants.js';
 export * from './errors.js';
 export type * from './types.js';
 export * from './schema/parsers.js';
+export * from './schema/mapping.js';
