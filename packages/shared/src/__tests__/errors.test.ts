@@ -43,4 +43,24 @@ describe('Errors 工厂', () => {
     expect(Errors.dbError().statusCode).toBe(500);
     expect(Errors.internalError('boom').code).toBe('INTERNAL_ERROR');
   });
+  it('unauthorized → 401 UNAUTHORIZED', () => {
+    const e = Errors.unauthorized();
+    expect(e.code).toBe('UNAUTHORIZED');
+    expect(e.statusCode).toBe(401);
+  });
+  it('invalidToken → 401 INVALID_TOKEN', () => {
+    const e = Errors.invalidToken();
+    expect(e.code).toBe('INVALID_TOKEN');
+    expect(e.statusCode).toBe(401);
+  });
+  it('forbidden → 403 FORBIDDEN', () => {
+    const e = Errors.forbidden();
+    expect(e.code).toBe('FORBIDDEN');
+    expect(e.statusCode).toBe(403);
+  });
+  it('authInvalidCredentials → 401 UNAUTHORIZED', () => {
+    const e = Errors.authInvalidCredentials();
+    expect(e.code).toBe('UNAUTHORIZED');
+    expect(e.statusCode).toBe(401);
+  });
 });
