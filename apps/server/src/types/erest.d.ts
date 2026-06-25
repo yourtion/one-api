@@ -3,7 +3,11 @@
 // 命名空间对象（不可 new）——CJS default 互操作已知限制。此声明重写模块类型，使 default 导出
 // 为构造器；运行时 module.exports.default === ERest 构造器（已验证）。
 //
-// 注：本声明仅覆盖 server 包所见类型；不影响 erest 包自身的 .d.ts。
+// 真实 API（源码确认）：
+//   - new ERest({ info, groups }) → 实例
+//   - instance.api.<method>(path) → ApiDef（链式 group/title/params/query/body/before/middlewares/register）
+//   - instance.bindRouter(router, instance.checkerLeiWeb)  // forceGroup:false 的绑定方式
+//   - checker 把 Zod 校验结果挂到 ctx.request.$params（{ query, body, params, headers }）
 declare module 'erest' {
   export interface ERestInfoOptions {
     title?: string;
@@ -47,20 +51,15 @@ declare module 'erest' {
 
   export interface ERestInstance<T = unknown> {
     api: ERestApi<T>;
-    bind(opts: {
-      framework: 'express' | 'koa' | 'leizmweb';
-      app?: unknown;
-      router?: unknown;
-    }): void;
+    bindRouter(router: unknown, checker: (inst: ERestInstance<T>, schema: unknown) => unknown): void;
+    checkerLeiWeb: (inst: ERestInstance<T>, schema: unknown) => unknown;
+    checkerExpress: (inst: ERestInstance<T>, schema: unknown) => unknown;
     group(name: string, info?: string): unknown;
-    docs?: unknown;
-    apiInfo?: unknown;
-    utils?: unknown;
+    genDocs(): unknown;
   }
 
   const ERest: new <T = unknown>(opts?: ERestOptions) => ERestInstance<T>;
   export default ERest;
-
   // zod 再导出（router 模块用 `import { z } from 'erest'`，与 erest 原生再导出一致）
   export { z } from 'zod';
 }

@@ -56,3 +56,26 @@ export async function startServer(opts: {
     },
   };
 }
+
+/** 用 admin/123456 登录，返回 set-cookie 串（后续请求带此 cookie 即已登录） */
+export async function loginAdmin(
+  baseURL: string,
+  cred: { name: string; password: string } = { name: 'admin', password: '123456' },
+): Promise<string> {
+  const res = await fetch(baseURL + '/api/auth/login', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(cred),
+  });
+  if (res.status !== 200) {
+    throw new Error(`loginAdmin 失败 status=${res.status} body=${await res.text()}`);
+  }
+  const cookie = res.headers.get('set-cookie');
+  if (!cookie) throw new Error('login 未返回 set-cookie');
+  return cookie.split(';')[0]!; // 只取 name=value（去掉 Max-Age/Path 等属性）
+}
+
+/** 组装带 cookie 的请求头 */
+export function adminAuthHeader(cookie: string): Record<string, string> {
+  return { cookie };
+}

@@ -4,9 +4,23 @@ import { log } from '../utils/logger.js';
 import type { AppContext } from '../types/context.js';
 import type { ErrorReason } from '@leizm/web';
 
-/** 判断是否 node-erest 的 Zod 校验错误（ERestError） */
+/**
+ * 判断是否 node-erest 的参数校验错误。
+ * erest 的 checker 抛出的是普通 Error（构造器名 'Error'，非 ERestError），其 message 形如
+ * "missing required parameter 'x'" / "type mismatch" 等——故按 message 特征匹配。
+ */
 function isERestError(err: unknown): boolean {
-  return typeof err === 'object' && err !== null && (err as { name?: string }).name === 'ERestError';
+  if (typeof err !== 'object' || err === null) return false;
+  const e = err as { name?: string; message?: string };
+  if (e.name === 'ERestError') return true;
+  const msg = e.message ?? '';
+  return (
+    /missing required parameter/i.test(msg) ||
+    /type mismatch/i.test(msg) ||
+    /unknown parameter/i.test(msg) ||
+    /parameter .* (is|required|invalid)/i.test(msg) ||
+    /invalid .* value/i.test(msg)
+  );
 }
 
 /**
