@@ -19,7 +19,7 @@
     "bcrypt": "^5.1.0",
     "better-sqlite3": "^12.0.0",
     "debug": "^4.3.0",
-    "erest": "^2.0.0",
+    "erest": "^2.1.0",
     "kysely": "^0.29.0"
   },
   "devDependencies": {

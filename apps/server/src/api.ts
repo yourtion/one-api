@@ -18,8 +18,8 @@ const ERest = erestModule.default;
 /**
  * 创建一个独立的 erest 实例（每个路由组各自一个，避免跨组路由污染 + 测试重复注册问题）。
  *
- * 真实绑定：`instance.bindRouter(router, instance.checkerLeiWeb)`，checker 把 Zod 校验结果
- * 挂到 `ctx.request.$params`（{ query, body, params, headers }）。
+ * 真实绑定（官方 leizmweb 模式）：`instance.bind({ framework: 'leizmweb', router })`，
+ * checker 把 Zod 校验结果挂到 `ctx.request.$params`（扁平合并 params+query+body+headers）。
  */
 export function createApi(): ERestInstance<unknown> {
   return new ERest<unknown>({

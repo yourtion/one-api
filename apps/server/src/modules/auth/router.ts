@@ -27,7 +27,7 @@ function toAdminVO(a: AdminRow) {
 
 /**
  * 注册 /api/auth/* 路由组：login/logout/me/password。
- * 建 cookieParser/session/body 前置中间件 + erest 定义 + bindRouter（checkerLeiWeb），挂到 app /api。
+ * 建 cookieParser/session/body 前置中间件 + erest 定义 + bind({ framework:'leizmweb', router })，挂到 app /api。
  * 使用独立 erest 实例（createApi），避免跨组污染与测试重复注册。
  * session 用全局共享 store（与 admin 路由组共用，否则登录态无法跨组读取）。
  */
@@ -50,7 +50,7 @@ export function registerAuthRoutes(app: AppApplication, opts: RegisterAuthOpts):
     .body(z.object({ name: z.string(), password: z.string() }))
     .register(
       (async (ctx) => {
-        const { name, password } = ctx.paramsInput as { name: string; password: string };
+        const { name, password } = ctx.request.$params as { name: string; password: string };
         const admin = await store.findByName(name);
         if (!admin || !comparePassword(password, admin.password_hash)) throw Errors.authInvalidCredentials();
         ctx.request.session['adminId'] = admin.id;
@@ -94,7 +94,7 @@ export function registerAuthRoutes(app: AppApplication, opts: RegisterAuthOpts):
     .body(z.object({ oldPassword: z.string(), newPassword: z.string().min(6) }))
     .register(
       (async (ctx) => {
-        const { oldPassword, newPassword } = ctx.paramsInput as { oldPassword: string; newPassword: string };
+        const { oldPassword, newPassword } = ctx.request.$params as { oldPassword: string; newPassword: string };
         const admin = await store.findById(ctx.currentUser!.id);
         if (!admin || !comparePassword(oldPassword, admin.password_hash)) throw Errors.authInvalidCredentials();
         await store.updatePassword(admin.id, hashPassword(newPassword));
@@ -103,6 +103,6 @@ export function registerAuthRoutes(app: AppApplication, opts: RegisterAuthOpts):
       }) as Middleware,
     );
 
-  api.bindRouter(router, api.checkerLeiWeb);
+  api.bind({ framework: "leizmweb", router });
   app.use('/api', router);
 }

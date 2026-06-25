@@ -17,16 +17,10 @@ export interface CurrentToken {
 }
 
 /**
- * 扩展 @leizm/web 的 Context：把 erest 校验后的 $params 与鉴权信息挂到 ctx 上。
- * 用 ctx.data（Context 内置的任意数据容器）承载，避免改 request 构造函数。
+ * 扩展 @leizm/web 的 Context：承载鉴权信息（currentUser/currentToken）。
+ * erest 校验后的参数直接读 `ctx.request.$params`（类型见 types/leizm-web.d.ts 增强声明）。
  */
 export class AppContext extends web.Context {
-  /** erest checker 注入的校验后输入（{ query, body, params, headers }） */
-  get paramsInput(): Record<string, unknown> {
-    const p = (this.request as unknown as { $params?: Record<string, unknown> }).$params;
-    return p ?? {};
-  }
-
   /** requireAdmin 注入：当前管理员 */
   get currentUser(): CurrentAdmin | undefined {
     return this.data['currentUser'] as CurrentAdmin | undefined;

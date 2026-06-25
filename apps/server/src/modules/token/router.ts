@@ -46,7 +46,7 @@ export function registerTokenRoutes(app: AppApplication, opts: RegisterTokenOpts
     .body(z.object({ name: z.string(), permissions: PermissionsSchema }))
     .register(
       (async (ctx) => {
-        const { name, permissions } = ctx.paramsInput as {
+        const { name, permissions } = ctx.request.$params as {
           name: string;
           permissions: { tables: string[]; actions: string[] };
         };
@@ -74,8 +74,8 @@ export function registerTokenRoutes(app: AppApplication, opts: RegisterTokenOpts
     )
     .register(
       (async (ctx) => {
-        const { id } = ctx.paramsInput as { id: number };
-        const body = ctx.paramsInput as {
+        const { id } = ctx.request.$params as { id: number };
+        const body = ctx.request.$params as {
           name?: string;
           permissions?: { tables: string[]; actions: string[] };
           isActive?: boolean;
@@ -111,12 +111,12 @@ export function registerTokenRoutes(app: AppApplication, opts: RegisterTokenOpts
     .params(z.object({ id: z.coerce.number() }))
     .register(
       (async (ctx) => {
-        const { id } = ctx.paramsInput as { id: number };
+        const { id } = ctx.request.$params as { id: number };
         await store.delete(id);
         ctx.response.json(ok({ success: true }));
       }) as Middleware,
     );
 
-  api.bindRouter(router, api.checkerLeiWeb);
+  api.bind({ framework: "leizmweb", router });
   app.use('/api', router);
 }

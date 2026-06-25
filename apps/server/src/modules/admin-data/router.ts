@@ -43,7 +43,7 @@ export function registerAdminDataRoutes(app: AppApplication, opts: RegisterAdmin
     .params(z.object({ id: z.coerce.number() }))
     .register(
       (async (ctx) => {
-        const { id } = ctx.paramsInput as { id: number };
+        const { id } = ctx.request.$params as { id: number };
         const name = await resolveName(id);
         const listOpts = parseListQuery(ctx.request.query as Record<string, unknown>);
         ctx.response.json(ok(await engine().data.list(name, listOpts, INTERNAL)));
@@ -58,7 +58,7 @@ export function registerAdminDataRoutes(app: AppApplication, opts: RegisterAdmin
     .params(z.object({ id: z.coerce.number() }))
     .register(
       (async (ctx) => {
-        const { id } = ctx.paramsInput as { id: number };
+        const { id } = ctx.request.$params as { id: number };
         const name = await resolveName(id);
         const listOpts = parseListQuery(ctx.request.query as Record<string, unknown>);
         const result = await engine().data.list(name, { ...listOpts, page: 1, size: 10000 }, INTERNAL);
@@ -80,7 +80,7 @@ export function registerAdminDataRoutes(app: AppApplication, opts: RegisterAdmin
     .params(z.object({ id: z.coerce.number(), pk: z.string() }))
     .register(
       (async (ctx) => {
-        const { id, pk } = ctx.paramsInput as { id: number; pk: string };
+        const { id, pk } = ctx.request.$params as { id: number; pk: string };
         const name = await resolveName(id);
         const row = await engine().data.get(name, pk, INTERNAL);
         if (!row) throw Errors.tableNotFound(name);
@@ -97,10 +97,10 @@ export function registerAdminDataRoutes(app: AppApplication, opts: RegisterAdmin
     .body(z.record(z.string(), z.unknown()))
     .register(
       (async (ctx) => {
-        const { id } = ctx.paramsInput as { id: number };
+        const { id } = ctx.request.$params as { id: number };
         const name = await resolveName(id);
         // erest $params 把 params 与 body 合并到顶层；body = 除路由参数 id 外的字段
-        const data = extractBody(ctx.paramsInput, ['id']);
+        const data = extractBody(ctx.request.$params, ['id']);
         const row = await engine().data.create(name, data, INTERNAL);
         ctx.response.status(201).json(ok(row));
       }) as Middleware,
@@ -115,9 +115,9 @@ export function registerAdminDataRoutes(app: AppApplication, opts: RegisterAdmin
     .body(z.record(z.string(), z.unknown()))
     .register(
       (async (ctx) => {
-        const { id, pk } = ctx.paramsInput as { id: number; pk: string };
+        const { id, pk } = ctx.request.$params as { id: number; pk: string };
         const name = await resolveName(id);
-        const patch = extractBody(ctx.paramsInput, ['id', 'pk']);
+        const patch = extractBody(ctx.request.$params, ['id', 'pk']);
         await engine().data.update(name, pk, patch, INTERNAL);
         ctx.response.json(ok({ success: true }));
       }) as Middleware,
@@ -131,14 +131,14 @@ export function registerAdminDataRoutes(app: AppApplication, opts: RegisterAdmin
     .params(z.object({ id: z.coerce.number(), pk: z.string() }))
     .register(
       (async (ctx) => {
-        const { id, pk } = ctx.paramsInput as { id: number; pk: string };
+        const { id, pk } = ctx.request.$params as { id: number; pk: string };
         const name = await resolveName(id);
         await engine().data.delete(name, pk, INTERNAL);
         ctx.response.json(ok({ success: true }));
       }) as Middleware,
     );
 
-  api.bindRouter(router, api.checkerLeiWeb);
+  api.bind({ framework: "leizmweb", router });
   app.use('/api', router);
 }
 
@@ -150,7 +150,7 @@ function csvCell(v: unknown): string {
 
 /**
  * 从 erest $params（params + body 合并到顶层）中提取 body 字段。
- * @param params ctx.paramsInput（{ id, pk, ...bodyFields }）
+ * @param params ctx.request.$params（{ id, pk, ...bodyFields }）
  * @param exclude 需排除的路由参数名（如 ['id']、['id','pk']）
  */
 function extractBody(params: Record<string, unknown>, exclude: string[]): Record<string, unknown> {

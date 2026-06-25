@@ -63,7 +63,7 @@ export function registerAdminRoutes(app: AppApplication, opts: RegisterAdminOpts
     .body(z.object({ name: z.string(), nickname: z.string(), password: z.string().min(6) }))
     .register(
       (async (ctx) => {
-        const { name, nickname, password } = ctx.paramsInput as { name: string; nickname: string; password: string };
+        const { name, nickname, password } = ctx.request.$params as { name: string; nickname: string; password: string };
         const row = await store.insert({ name, nickname, passwordHash: hashPassword(password), mustChangePassword: 1 });
         ctx.response.status(201).json(ok(toVO(row)));
       }) as Middleware,
@@ -78,8 +78,8 @@ export function registerAdminRoutes(app: AppApplication, opts: RegisterAdminOpts
     .body(z.object({ nickname: z.string().optional(), password: z.string().min(6).optional() }))
     .register(
       (async (ctx) => {
-        const { id } = ctx.paramsInput as { id: number };
-        const body = ctx.paramsInput as { nickname?: string; password?: string };
+        const { id } = ctx.request.$params as { id: number };
+        const body = ctx.request.$params as { nickname?: string; password?: string };
         if (body.nickname !== undefined) await store.updateProfile(id, { nickname: body.nickname });
         if (body.password !== undefined) {
           await store.updatePassword(id, hashPassword(body.password));
@@ -97,13 +97,13 @@ export function registerAdminRoutes(app: AppApplication, opts: RegisterAdminOpts
     .params(z.object({ id: z.coerce.number() }))
     .register(
       (async (ctx) => {
-        const { id } = ctx.paramsInput as { id: number };
+        const { id } = ctx.request.$params as { id: number };
         if (ctx.currentUser!.id === id) throw Errors.validationFail('不可删除自己');
         await store.delete(id);
         ctx.response.json(ok({ success: true }));
       }) as Middleware,
     );
 
-  api.bindRouter(router, api.checkerLeiWeb);
+  api.bind({ framework: "leizmweb", router });
   app.use('/api', router);
 }

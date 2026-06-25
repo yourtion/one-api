@@ -66,7 +66,7 @@ export function registerDataRoutes(app: AppApplication, opts: RegisterDataOpts):
     .params(z.object({ table: z.string(), pk: z.string() }))
     .register(
       (async (ctx) => {
-        const { table, pk } = ctx.paramsInput as { table: string; pk: string };
+        const { table, pk } = ctx.request.$params as { table: string; pk: string };
         const row = await engine().data.get(table, pk);
         if (!row) throw Errors.tableNotFound(table);
         ctx.response.json(ok(row));
@@ -84,8 +84,8 @@ export function registerDataRoutes(app: AppApplication, opts: RegisterDataOpts):
     .body(z.record(z.string(), z.unknown()))
     .register(
       (async (ctx) => {
-        const { table } = ctx.paramsInput as { table: string };
-        const data = extractBody(ctx.paramsInput, ['table']);
+        const { table } = ctx.request.$params as { table: string };
+        const data = extractBody(ctx.request.$params, ['table']);
         ctx.response.status(201).json(ok(await engine().data.create(table, data)));
       }) as Middleware,
     );
@@ -101,8 +101,8 @@ export function registerDataRoutes(app: AppApplication, opts: RegisterDataOpts):
     .body(z.record(z.string(), z.unknown()))
     .register(
       (async (ctx) => {
-        const { table, pk } = ctx.paramsInput as { table: string; pk: string };
-        const patch = extractBody(ctx.paramsInput, ['table', 'pk']);
+        const { table, pk } = ctx.request.$params as { table: string; pk: string };
+        const patch = extractBody(ctx.request.$params, ['table', 'pk']);
         await engine().data.update(table, pk, patch);
         ctx.response.json(ok({ success: true }));
       }) as Middleware,
@@ -118,7 +118,7 @@ export function registerDataRoutes(app: AppApplication, opts: RegisterDataOpts):
     .params(z.object({ table: z.string(), pk: z.string() }))
     .register(
       (async (ctx) => {
-        const { table, pk } = ctx.paramsInput as { table: string; pk: string };
+        const { table, pk } = ctx.request.$params as { table: string; pk: string };
         await engine().data.delete(table, pk);
         ctx.response.json(ok({ success: true }));
       }) as Middleware,
@@ -135,14 +135,14 @@ export function registerDataRoutes(app: AppApplication, opts: RegisterDataOpts):
     .body(z.object({ pk: z.union([z.string(), z.number()]), field: z.string(), count: z.number() }))
     .register(
       (async (ctx) => {
-        const { table } = ctx.paramsInput as { table: string };
-        const { pk, field, count } = ctx.paramsInput as { pk: string | number; field: string; count: number };
+        const { table } = ctx.request.$params as { table: string };
+        const { pk, field, count } = ctx.request.$params as { pk: string | number; field: string; count: number };
         await engine().data.incr(table, pk, field, count);
         ctx.response.json(ok({ success: true }));
       }) as Middleware,
     );
 
-  api.bindRouter(router, api.checkerLeiWeb);
+  api.bind({ framework: "leizmweb", router });
   app.use('/api', router);
 }
 

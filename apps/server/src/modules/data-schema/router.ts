@@ -43,7 +43,7 @@ export function registerDataSchemaRoutes(app: AppApplication, opts: RegisterData
     )
     .register(
       (async (ctx) => {
-        const input = ctx.paramsInput as {
+        const input = ctx.request.$params as {
           name: string;
           label: string;
           fields: Record<string, unknown>[];
@@ -78,11 +78,11 @@ export function registerDataSchemaRoutes(app: AppApplication, opts: RegisterData
     .register(
       (async (ctx) => {
         const table = String(ctx.request.params['table']);
-        const { field } = ctx.paramsInput as { field: Record<string, unknown> };
+        const { field } = ctx.request.$params as { field: Record<string, unknown> };
         ctx.response.json(ok(await engine().schema.addField(table, field as unknown as FieldMetaInput)));
       }) as Middleware,
     );
 
-  api.bindRouter(router, api.checkerLeiWeb);
+  api.bind({ framework: "leizmweb", router });
   app.use('/api', router);
 }

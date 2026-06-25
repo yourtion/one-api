@@ -26,7 +26,7 @@ async function main(): Promise<void> {
   const app = buildApp({
     sessionSecret: cfg.sessionSecret,
     registerRoutes: (a) => {
-      // 每组独立 erest 实例 + 独立 router（各自 bindRouter），session 用全局共享 store
+      // 每组独立 erest 实例 + 独立 router（各自 bind({ framework:'leizmweb', router })），session 用全局共享 store
       registerAuthRoutes(a, { systemDb: systemHandle.db, sessionSecret: cfg.sessionSecret });
       registerTableRoutes(a, { systemDb: systemHandle.db, sessionSecret: cfg.sessionSecret });
       registerAdminDataRoutes(a, { systemDb: systemHandle.db, sessionSecret: cfg.sessionSecret });

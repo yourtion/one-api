@@ -36,8 +36,8 @@ importers:
         specifier: ^4.3.0
         version: 4.4.3
       erest:
-        specifier: ^2.0.0
-        version: 2.0.0(@types/node@26.0.0)
+        specifier: ^2.1.0
+        version: 2.1.0(@types/node@26.0.0)
       kysely:
         specifier: ^0.29.0
         version: 0.29.2
@@ -1040,8 +1040,8 @@ packages:
   end-of-stream@1.4.5:
     resolution: {integrity: sha512-ooEGc6HP26xXq/N+GCGOT0JKCLDGrq2bQUZrQ7gyrJiZANJ/8YDTxTpQBXGMn+WbIQXNVpyWymm7KYVICQnyOg==}
 
-  erest@2.0.0:
-    resolution: {integrity: sha512-MOcc8a1uaaTFPnTAIAiJSFr0xGzhpdHEyqsAkjPHPzj98agPj5HeVChDNwrN9ktWCHP6JatAg4qmpWfcIUvBbg==}
+  erest@2.1.0:
+    resolution: {integrity: sha512-c4BqoO1YA4fLt89ugRF0aa4shRwOgG+7q8KUgC7gyiLr/jFkY27KXr0g/H8P9PGTS20EO9dN/UM6HAwzj7O0WQ==}
     peerDependencies:
       '@types/node': '*'
 
@@ -2536,7 +2536,7 @@ snapshots:
     dependencies:
       once: 1.4.0
 
-  erest@2.0.0(@types/node@26.0.0):
+  erest@2.1.0(@types/node@26.0.0):
     dependencies:
       '@types/node': 26.0.0
       debug: 4.4.3

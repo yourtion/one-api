@@ -3,11 +3,11 @@
 // 命名空间对象（不可 new）——CJS default 互操作已知限制。此声明重写模块类型，使 default 导出
 // 为构造器；运行时 module.exports.default === ERest 构造器（已验证）。
 //
-// 真实 API（源码确认）：
+// 真实 API（源码 node-erest 确认）：
 //   - new ERest({ info, groups }) → 实例
 //   - instance.api.<method>(path) → ApiDef（链式 group/title/params/query/body/before/middlewares/register）
-//   - instance.bindRouter(router, instance.checkerLeiWeb)  // forceGroup:false 的绑定方式
-//   - checker 把 Zod 校验结果挂到 ctx.request.$params（{ query, body, params, headers }）
+//   - instance.bind({ framework: 'leizmweb', router })  // forceGroup:false 的绑定方式（官方推荐）
+//   - checker 把 Zod 校验结果挂到 ctx.request.$params（**扁平**合并 params+query+body+headers）
 declare module 'erest' {
   export interface ERestInfoOptions {
     title?: string;
@@ -49,11 +49,15 @@ declare module 'erest' {
     head(path: string): ApiDef<T>;
   }
 
+  /** bind 选项：forceGroup:false 用 router（官方 leizmweb 非分组模式） */
+  export interface ERestBindOptions {
+    framework: 'leizmweb';
+    router: unknown;
+  }
+
   export interface ERestInstance<T = unknown> {
     api: ERestApi<T>;
-    bindRouter(router: unknown, checker: (inst: ERestInstance<T>, schema: unknown) => unknown): void;
-    checkerLeiWeb: (inst: ERestInstance<T>, schema: unknown) => unknown;
-    checkerExpress: (inst: ERestInstance<T>, schema: unknown) => unknown;
+    bind(opts: ERestBindOptions): void;
     group(name: string, info?: string): unknown;
     genDocs(): unknown;
   }

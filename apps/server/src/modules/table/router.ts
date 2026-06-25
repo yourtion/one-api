@@ -46,7 +46,7 @@ export function registerTableRoutes(app: AppApplication, opts: RegisterTableOpts
     .params(z.object({ id: z.coerce.number() }))
     .register(
       (async (ctx) => {
-        const { id } = ctx.paramsInput as { id: number };
+        const { id } = ctx.request.$params as { id: number };
         const meta = await engine().metadata.getMeta(id);
         if (!meta) throw Errors.tableNotFound(String(id));
         ctx.response.json(ok(meta));
@@ -61,7 +61,7 @@ export function registerTableRoutes(app: AppApplication, opts: RegisterTableOpts
     .body(z.object({ name: z.string() }))
     .register(
       (async (ctx) => {
-        const { name } = ctx.paramsInput as { name: string };
+        const { name } = ctx.request.$params as { name: string };
         assertNotReserved(name);
         const meta = await engine().schema.importExisting(name);
         ctx.response.status(201).json(ok(meta));
@@ -84,7 +84,7 @@ export function registerTableRoutes(app: AppApplication, opts: RegisterTableOpts
     )
     .register(
       (async (ctx) => {
-        const input = ctx.paramsInput as {
+        const input = ctx.request.$params as {
           name: string;
           label: string;
           fields: Record<string, unknown>[];
@@ -122,8 +122,8 @@ export function registerTableRoutes(app: AppApplication, opts: RegisterTableOpts
     )
     .register(
       (async (ctx) => {
-        const { id } = ctx.paramsInput as { id: number };
-        const body = ctx.paramsInput as {
+        const { id } = ctx.request.$params as { id: number };
+        const body = ctx.request.$params as {
           label?: string;
           note?: string | null;
           isPublished?: boolean;
@@ -147,7 +147,7 @@ export function registerTableRoutes(app: AppApplication, opts: RegisterTableOpts
     .params(z.object({ id: z.coerce.number() }))
     .register(
       (async (ctx) => {
-        const { id } = ctx.paramsInput as { id: number };
+        const { id } = ctx.request.$params as { id: number };
         const meta = await engine().metadata.getMeta(id);
         if (!meta) throw Errors.tableNotFound(String(id));
         ctx.response.json(ok(await engine().schema.refresh(meta.name)));
@@ -163,14 +163,14 @@ export function registerTableRoutes(app: AppApplication, opts: RegisterTableOpts
     .body(z.object({ confirm: z.boolean() }))
     .register(
       (async (ctx) => {
-        const { id } = ctx.paramsInput as { id: number };
-        const { confirm } = ctx.paramsInput as { confirm: boolean };
+        const { id } = ctx.request.$params as { id: number };
+        const { confirm } = ctx.request.$params as { confirm: boolean };
         if (!confirm) throw Errors.validationFail('需 confirm:true 确认');
         await engine().metadata.deleteMeta(id);
         ctx.response.json(ok({ success: true }));
       }) as Middleware,
     );
 
-  api.bindRouter(router, api.checkerLeiWeb);
+  api.bind({ framework: "leizmweb", router });
   app.use('/api', router);
 }
