@@ -79,3 +79,76 @@ export async function loginAdmin(
 export function adminAuthHeader(cookie: string): Record<string, string> {
   return { cookie };
 }
+
+/** 用 admin session 发起请求（自动带 cookie + json 头） */
+export async function adminFetch(
+  baseURL: string,
+  cookie: string,
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  return fetch(baseURL + path, {
+    ...init,
+    headers: { 'content-type': 'application/json', ...adminAuthHeader(cookie), ...init.headers },
+  });
+}
+
+/** 在业务库直接建一张表（绕过 API，用于准备导入测试数据） */
+export async function seedBusinessTable(businessDbPath: string, ddl: string): Promise<void> {
+  const Database = (await import('better-sqlite3')).default;
+  const db = new Database(businessDbPath);
+  db.exec(ddl);
+  db.close();
+}
+
+/** 导入已有表（需先用 seedBusinessTable 建表）。返回 table_meta id */
+export async function importTable(baseURL: string, cookie: string, name: string): Promise<{ id: number }> {
+  const res = await adminFetch(baseURL, cookie, '/api/admin/tables/import', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+  const body = (await res.json()) as { success: boolean; data: { id: number }; error?: { message: string } };
+  if (!body.success) throw new Error('importTable failed: ' + JSON.stringify(body.error));
+  return body.data;
+}
+
+/** 新建模型。返回 table_meta id */
+export async function createModel(
+  baseURL: string,
+  cookie: string,
+  input: Record<string, unknown>,
+): Promise<{ id: number }> {
+  const res = await adminFetch(baseURL, cookie, '/api/admin/tables', { method: 'POST', body: JSON.stringify(input) });
+  const body = (await res.json()) as { success: boolean; data: { id: number }; error?: { message: string } };
+  if (!body.success) throw new Error('createModel failed: ' + JSON.stringify(body.error));
+  return body.data;
+}
+
+/** 用 admin session 创建 token，返回明文（仅此一次） */
+export async function createToken(
+  baseURL: string,
+  cookie: string,
+  input: { name: string; permissions: { tables: string[]; actions: string[] } },
+): Promise<string> {
+  const res = await adminFetch(baseURL, cookie, '/api/admin/tokens', { method: 'POST', body: JSON.stringify(input) });
+  const body = (await res.json()) as { data: { token: string } };
+  return body.data.token;
+}
+
+/** 组装 Bearer 头 */
+export function tokenAuthHeader(token: string): Record<string, string> {
+  return { authorization: `Bearer ${token}` };
+}
+
+/** 对外 data 请求（带 token） */
+export async function dataFetch(
+  baseURL: string,
+  token: string,
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  return fetch(baseURL + path, {
+    ...init,
+    headers: { 'content-type': 'application/json', ...tokenAuthHeader(token), ...init.headers },
+  });
+}

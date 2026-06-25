@@ -9,14 +9,12 @@ import { ok } from '../../utils/response.js';
 import { comparePassword, hashPassword } from '../../utils/password.js';
 import { createAdminStore, type AdminRow } from '../../middlewares/admin-store.js';
 import { requireAdmin } from '../../middlewares/session-auth.js';
+import { sessionMiddleware } from '../../middlewares/session-store.js';
 
 export interface RegisterAuthOpts {
   systemDb: Kysely<ServerSystemDB>;
   sessionSecret: string;
 }
-
-/** session 有效期 1 天（@leizm/web 默认 maxAge=0 会立即过期，必须传正值） */
-const SESSION_MAX_AGE = 86_400_000;
 
 function toAdminVO(a: AdminRow) {
   return {
@@ -31,15 +29,16 @@ function toAdminVO(a: AdminRow) {
  * 注册 /api/auth/* 路由组：login/logout/me/password。
  * 建 cookieParser/session/body 前置中间件 + erest 定义 + bindRouter（checkerLeiWeb），挂到 app /api。
  * 使用独立 erest 实例（createApi），避免跨组污染与测试重复注册。
+ * session 用全局共享 store（与 admin 路由组共用，否则登录态无法跨组读取）。
  */
 export function registerAuthRoutes(app: AppApplication, opts: RegisterAuthOpts): void {
   const router = new AppRouter();
   const store = createAdminStore(opts.systemDb);
   const api = createApi();
 
-  // 前置中间件（仅 auth 组）。@leizm/web 内置组件返回基础 Context 中间件，cast 到 AppContext 中间件。
+  // 前置中间件：cookieParser + 共享 session + body
   router.use('/', web.component.cookieParser(opts.sessionSecret) as unknown as Middleware);
-  router.use('/', web.component.session({ store: new web.component.SessionMemoryStore(), maxAge: SESSION_MAX_AGE }) as unknown as Middleware);
+  router.use('/', sessionMiddleware as unknown as Middleware);
   router.use('/', web.component.bodyParser.json() as unknown as Middleware);
   router.use('/', web.component.bodyParser.urlencoded({ extended: true }) as unknown as Middleware);
 
