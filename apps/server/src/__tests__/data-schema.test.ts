@@ -111,4 +111,37 @@ describe('对外 data-schema /api/data/_schema/*（Token schema action）', () =
     });
     expect(res.status).toBe(201);
   });
+
+  it('tables 白名单含新表名（非 *）→ 允许建表；不含 → 403', async () => {
+    const { baseURL } = await start();
+    const cookie = await loginAdmin(baseURL);
+    // 白名单含 specific 表名
+    const tokAllow = await createToken(baseURL, cookie, {
+      name: 'allow',
+      permissions: { tables: ['allowed_tbl'], actions: ['schema'] },
+    });
+    const okRes = await dataFetch(baseURL, tokAllow, '/api/data/_schema/tables', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'allowed_tbl',
+        label: 'a',
+        fields: [{ name: 'id', jsonType: 'integer', isPrimary: true }],
+      }),
+    });
+    expect(okRes.status).toBe(201);
+    // 白名单不含新表名（非 *）→ 403
+    const tokDeny = await createToken(baseURL, cookie, {
+      name: 'deny',
+      permissions: { tables: ['other'], actions: ['schema'] },
+    });
+    const denyRes = await dataFetch(baseURL, tokDeny, '/api/data/_schema/tables', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'denied_tbl',
+        label: 'd',
+        fields: [{ name: 'id', jsonType: 'integer', isPrimary: true }],
+      }),
+    });
+    expect(denyRes.status).toBe(403);
+  });
 });

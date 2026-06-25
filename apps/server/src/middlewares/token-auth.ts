@@ -49,9 +49,12 @@ export function createCheckPermission(
     if (!token) throw Errors.invalidToken();
     let tableName: string;
     if (opts?.tableFromBody) {
-      const body = ctx.paramsInput['body'] as Record<string, unknown> | undefined;
+      // .before 钩子在 erest checker 之前运行，$params 尚未注入；
+      // 但 router 级 bodyParser 已解析 body，故从 ctx.request.body 取字段。
+      const body = ctx.request.body as Record<string, unknown> | undefined;
       tableName = String(body?.[opts.tableFromBody] ?? '');
     } else {
+      // :table 路由参数由 @leizm/web 在链首注入，不受 checker 时序影响
       tableName = String(ctx.request.params[tableKey] ?? '');
     }
     const { tables, actions } = token.permissions;
