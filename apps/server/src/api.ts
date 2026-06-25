@@ -1,10 +1,22 @@
-import ERest, { type ERestInstance } from 'erest';
+import { createRequire } from 'node:module';
+import type { ERestInstance } from 'erest';
+
+/**
+ * erest 是 CJS 模块（package.json type:null）。其运行时导出挂在 module.exports：
+ *   - module.exports.default = ERest 构造器
+ *   - module.exports.z = zod
+ * 在 verbatimModuleSyntax + NodeNext 下，`import ERest from 'erest'` 经 tsc 原样输出后，
+ * 运行时 ERest = 整个 module.exports 命名空间（不可 new）。故用 createRequire 取 .default。
+ * 类型由 apps/server/src/types/erest.d.ts 桥接。
+ */
+const require = createRequire(import.meta.url);
+const erestModule = require('erest') as {
+  default: new <T = unknown>(opts?: Record<string, unknown>) => ERestInstance<T>;
+};
+const ERest = erestModule.default;
 
 /**
  * 创建一个独立的 erest 实例（每个路由组各自一个，避免跨组路由污染 + 测试重复注册问题）。
- *
- * erest 是 CJS 模块，类型由 apps/server/src/types/erest.d.ts 桥接（修 CJS default 互操作：
- * 原生 .d.ts 的 `import X from 'erest'` 在 NodeNext 下不可 new）。
  *
  * 真实绑定：`instance.bindRouter(router, instance.checkerLeiWeb)`，checker 把 Zod 校验结果
  * 挂到 `ctx.request.$params`（{ query, body, params, headers }）。

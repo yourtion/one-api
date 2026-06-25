@@ -21,7 +21,8 @@ one-api/
 
 **分期进度：**
 - Phase 1（shared + engine）：✅ 已完成并合入 main
-- Phase 2（HTTP API 服务）/ Phase 3（管理界面）/ Phase 4（MCP）/ Phase 5（SDK+CLI）：待启动
+- Phase 2（HTTP API 服务）：✅ 已完成（apps/server，worktree 待合入 main）
+- Phase 3（管理界面）/ Phase 4（MCP）/ Phase 5（SDK+CLI）：待启动
 
 设计依据见 `docs/superpowers/specs/2026-06-24-one-api-overview.md` + 各 phase spec。
 

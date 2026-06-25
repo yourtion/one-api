@@ -3,6 +3,13 @@ import { initSystemDb } from './db/system.js';
 import { initEngine } from './core/engine.js';
 import { buildApp } from './app.js';
 import { log } from './utils/logger.js';
+import { registerAuthRoutes } from './modules/auth/router.js';
+import { registerTableRoutes } from './modules/table/router.js';
+import { registerAdminDataRoutes } from './modules/admin-data/router.js';
+import { registerTokenRoutes } from './modules/token/router.js';
+import { registerAdminRoutes } from './modules/admin/router.js';
+import { registerDataRoutes } from './modules/data/router.js';
+import { registerDataSchemaRoutes } from './modules/data-schema/router.js';
 
 async function main(): Promise<void> {
   const cfg = loadConfig();
@@ -15,11 +22,18 @@ async function main(): Promise<void> {
     systemDbPath: cfg.systemDbPath,
   });
 
-  // 3. app（路由组占位，后续 task 接入）
+  // 3. app：注册全部路由组（auth / admin×4 / data / data-schema）
   const app = buildApp({
     sessionSecret: cfg.sessionSecret,
-    registerRoutes: (_app) => {
-      // Task 9-13 在此挂载 auth/admin/data 路由组
+    registerRoutes: (a) => {
+      // 每组独立 erest 实例 + 独立 router（各自 bindRouter），session 用全局共享 store
+      registerAuthRoutes(a, { systemDb: systemHandle.db, sessionSecret: cfg.sessionSecret });
+      registerTableRoutes(a, { systemDb: systemHandle.db, sessionSecret: cfg.sessionSecret });
+      registerAdminDataRoutes(a, { systemDb: systemHandle.db, sessionSecret: cfg.sessionSecret });
+      registerTokenRoutes(a, { systemDb: systemHandle.db, sessionSecret: cfg.sessionSecret });
+      registerAdminRoutes(a, { systemDb: systemHandle.db, sessionSecret: cfg.sessionSecret });
+      registerDataRoutes(a, { systemDb: systemHandle.db });
+      registerDataSchemaRoutes(a, { systemDb: systemHandle.db });
     },
   });
 
@@ -32,6 +46,7 @@ async function main(): Promise<void> {
     log.startup('one-api 启动完成：端口 %d | 表数量：%d', cfg.port, metas.length);
     log.startup('业务库：%s', cfg.businessDbPath);
     log.startup('系统库：%s', cfg.systemDbPath);
+    log.startup('默认管理员：%s（首次登录强制改密）', cfg.defaultAdmin.name);
   });
 }
 
