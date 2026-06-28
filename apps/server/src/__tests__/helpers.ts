@@ -1,154 +1,128 @@
+import express from 'express';
+import { ExpressAdapter } from '@erest/express';
+import ERest from 'erest';
+import { API_INFO, GROUPS } from '../api/groups.js';
+import { applyEnvelopeFormat } from '../api/format.js';
+import { registerAuthRoutes } from '../routes/auth.js';
+import { registerTableRoutes } from '../routes/table.js';
+import { registerAdminDataRoutes } from '../routes/admin-data.js';
+import { registerTokenRoutes } from '../routes/token.js';
+import { registerAdminRoutes } from '../routes/admins.js';
+import { registerDataRoutes } from '../routes/data.js';
+import { registerDataSchemaRoutes } from '../routes/data-schema.js';
+import { initSystemDb, type SystemDbHandle } from '../db/system.js';
+import { initEngine, _resetEngine } from '../core/engine.js';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import http from 'node:http';
-import type { Application } from '@leizm/web';
 
-export interface TestServer {
-  app: Application;
-  server: http.Server;
-  baseURL: string;
-  systemDbPath: string;
+export interface TestSetup {
+  api: ERest<unknown>;
+  systemDb: SystemDbHandle['db'];
   businessDbPath: string;
-  close: () => Promise<void>;
+  /** 走 erest initTest 的测试客户端（无鉴权态） */
+  session: () => ReturnType<ERest<unknown>['test']['session']>;
+  /** admin/123456 登录，返回 admin token 明文（后续 .headers({authorization: Bearer})） */
+  adminToken: () => Promise<string>;
+  /** 直接插入一个对外 token 行，返回明文（绕过 API） */
+  insertToken: (perms: { tables: string[]; actions: string[] }) => Promise<string>;
+  cleanup: () => Promise<void>;
 }
 
 let counter = 0;
 
 /**
- * 启动临时 server（随机端口 + 临时 SQLite）。每次唯一路径。
- * 用法：const { server, baseURL } = await startServer(); const res = await fetch(baseURL + '/healthz');
+ * 创建一个完整测试环境：临时 system/business db + engine + erest 实例（express 载体）+ initTest。
+ * 每个测试文件 beforeAll 调一次，afterAll cleanup。
  *
- * @param build 接收临时库路径，返回装配好的 @leizm/web Application 与清理函数
+ * 关键：erest 实例每次新建（重复注册会 assert）；engine 单例须每个 setup 重置（_resetEngine）。
+ * 鉴权用 admin token（无 session）：adminToken() 调 /api/auth/login 拿明文 token。
  */
-export async function startServer(opts: {
-  build: (cfg: { systemDbPath: string; businessDbPath: string }) => Promise<{
-    app: Application;
-    close: () => Promise<void>;
-  }>;
-}): Promise<TestServer> {
-  const dir = mkdtempSync(join(tmpdir(), `1api-server-${counter}-`));
+export async function setupTest(): Promise<TestSetup> {
+  _resetEngine();
+  const dir = mkdtempSync(join(tmpdir(), `1api-test-${counter}-`));
   counter += 1;
   const systemDbPath = join(dir, 'system.db');
   const businessDbPath = join(dir, 'business.db');
 
-  const { app, close } = await opts.build({ systemDbPath, businessDbPath });
+  const systemDb = await initSystemDb(systemDbPath);
+  const engine = await initEngine({ businessDbPath, systemDbPath });
 
-  // app.server 是惰性 getter，listen 后才创建。用 listen 绑定随机端口。
-  await new Promise<void>((resolve) => {
-    app.listen({ port: 0, host: '127.0.0.1' }, resolve);
-  });
-  const server = app.server as unknown as http.Server;
-  const addr = server.address();
-  const port = typeof addr === 'object' && addr ? addr.port : 0;
-  const baseURL = `http://127.0.0.1:${port}`;
+  const api = new ERest<unknown>({ info: API_INFO, groups: GROUPS, forceGroup: true });
+  applyEnvelopeFormat(api);
 
-  return {
-    app,
-    server,
-    baseURL,
-    systemDbPath,
-    businessDbPath,
-    close: async () => {
-      await new Promise<void>((resolve, reject) => server.close((e) => (e ? reject(e) : resolve())));
-      await close();
-      rmSync(dir, { recursive: true, force: true });
+  // 注册全部路由组
+  const routeDeps = { systemDb: systemDb.db, api };
+  registerAuthRoutes(routeDeps);
+  registerTableRoutes(routeDeps);
+  registerAdminDataRoutes(routeDeps);
+  registerTokenRoutes(routeDeps);
+  registerAdminRoutes(routeDeps);
+  registerDataRoutes(routeDeps);
+  registerDataSchemaRoutes(routeDeps);
+
+  // 注意：erest group prefix 是 /auth /admin /data（无 /api），故 initTest 也用无 /api 路径。
+  const app = express();
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+  api.bind({ adapter: new ExpressAdapter(), app, router: express.Router });
+  // express 错误中间件（与 leizmweb 的 app 级中间件语义一致：统一信封）
+  app.use(
+    (
+      err: { statusCode?: number; status?: number; message?: string; code?: string },
+      _req: unknown,
+      res: { status: (c: number) => { json: (b: unknown) => void } },
+      _next: unknown,
+    ) => {
+      res.status(err.statusCode || err.status || 500).json({ success: false, error: { code: err.code ?? 'INTERNAL_ERROR', message: err.message } });
     },
+  );
+
+  api.initTest(app);
+
+  const session = () => api.test.session();
+
+  const adminToken = async () => {
+    const ret = (await session().post('/auth/login').input({ name: 'admin', password: '123456' }).success()) as {
+      token: string;
+    };
+    return ret.token;
   };
+
+  const insertToken = async (perms: { tables: string[]; actions: string[] }) => {
+    const plain = 'oa_testtoken_' + Math.random().toString(36).slice(2);
+    const hash = createHash('sha256').update(plain).digest('hex');
+    await systemDb.db
+      .insertInto('api_token')
+      .values({
+        name: 'test',
+        token_hash: hash,
+        token_prefix: plain.slice(0, 8) + '****',
+        permissions: JSON.stringify(perms),
+        is_active: 1,
+        expires_at: null,
+        last_used_at: null,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      })
+      .execute();
+    return plain;
+  };
+
+  const cleanup = async () => {
+    await engine.destroy();
+    await systemDb.close();
+    rmSync(dir, { recursive: true, force: true });
+  };
+
+  return { api, systemDb: systemDb.db, businessDbPath, session, adminToken, insertToken, cleanup };
 }
 
-/** 用 admin/123456 登录，返回 set-cookie 串（后续请求带此 cookie 即已登录） */
-export async function loginAdmin(
-  baseURL: string,
-  cred: { name: string; password: string } = { name: 'admin', password: '123456' },
-): Promise<string> {
-  const res = await fetch(baseURL + '/api/auth/login', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(cred),
-  });
-  if (res.status !== 200) {
-    throw new Error(`loginAdmin 失败 status=${res.status} body=${await res.text()}`);
-  }
-  const cookie = res.headers.get('set-cookie');
-  if (!cookie) throw new Error('login 未返回 set-cookie');
-  return cookie.split(';')[0]!; // 只取 name=value（去掉 Max-Age/Path 等属性）
-}
-
-/** 组装带 cookie 的请求头 */
-export function adminAuthHeader(cookie: string): Record<string, string> {
-  return { cookie };
-}
-
-/** 用 admin session 发起请求（自动带 cookie + json 头） */
-export async function adminFetch(
-  baseURL: string,
-  cookie: string,
-  path: string,
-  init: RequestInit = {},
-): Promise<Response> {
-  return fetch(baseURL + path, {
-    ...init,
-    headers: { 'content-type': 'application/json', ...adminAuthHeader(cookie), ...init.headers },
-  });
-}
-
-/** 在业务库直接建一张表（绕过 API，用于准备导入测试数据） */
+/** 在业务库直接建一张表（绕过 API，准备导入测试数据） */
 export async function seedBusinessTable(businessDbPath: string, ddl: string): Promise<void> {
   const Database = (await import('better-sqlite3')).default;
   const db = new Database(businessDbPath);
   db.exec(ddl);
   db.close();
-}
-
-/** 导入已有表（需先用 seedBusinessTable 建表）。返回 table_meta id */
-export async function importTable(baseURL: string, cookie: string, name: string): Promise<{ id: number }> {
-  const res = await adminFetch(baseURL, cookie, '/api/admin/tables/import', {
-    method: 'POST',
-    body: JSON.stringify({ name }),
-  });
-  const body = (await res.json()) as { success: boolean; data: { id: number }; error?: { message: string } };
-  if (!body.success) throw new Error('importTable failed: ' + JSON.stringify(body.error));
-  return body.data;
-}
-
-/** 新建模型。返回 table_meta id */
-export async function createModel(
-  baseURL: string,
-  cookie: string,
-  input: Record<string, unknown>,
-): Promise<{ id: number }> {
-  const res = await adminFetch(baseURL, cookie, '/api/admin/tables', { method: 'POST', body: JSON.stringify(input) });
-  const body = (await res.json()) as { success: boolean; data: { id: number }; error?: { message: string } };
-  if (!body.success) throw new Error('createModel failed: ' + JSON.stringify(body.error));
-  return body.data;
-}
-
-/** 用 admin session 创建 token，返回明文（仅此一次） */
-export async function createToken(
-  baseURL: string,
-  cookie: string,
-  input: { name: string; permissions: { tables: string[]; actions: string[] } },
-): Promise<string> {
-  const res = await adminFetch(baseURL, cookie, '/api/admin/tokens', { method: 'POST', body: JSON.stringify(input) });
-  const body = (await res.json()) as { data: { token: string } };
-  return body.data.token;
-}
-
-/** 组装 Bearer 头 */
-export function tokenAuthHeader(token: string): Record<string, string> {
-  return { authorization: `Bearer ${token}` };
-}
-
-/** 对外 data 请求（带 token） */
-export async function dataFetch(
-  baseURL: string,
-  token: string,
-  path: string,
-  init: RequestInit = {},
-): Promise<Response> {
-  return fetch(baseURL + path, {
-    ...init,
-    headers: { 'content-type': 'application/json', ...tokenAuthHeader(token), ...init.headers },
-  });
 }

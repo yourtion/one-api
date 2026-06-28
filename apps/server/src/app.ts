@@ -1,75 +1,100 @@
-import { AppApplication, AppRouter, type AppContext, type Middleware } from './types/context.js';
-import { errorMiddleware } from './middlewares/error.js';
-import { notFoundMiddleware } from './middlewares/not-found.js';
+import * as web from '@leizm/web';
+import { LeizmWebAdapter } from '@erest/leizmweb';
+import type { Kysely } from 'kysely';
+import { AppError, ErrorCode } from '@1api/shared';
+import type { ServerSystemDB } from './db/types.js';
+import { api } from './api/instance.js';
+import { fail, ok } from './utils/response.js';
 import { log } from './utils/logger.js';
-import { ok } from './utils/response.js';
+import { registerAuthRoutes } from './routes/auth.js';
+import { registerTableRoutes } from './routes/table.js';
+import { registerAdminDataRoutes } from './routes/admin-data.js';
+import { registerTokenRoutes } from './routes/token.js';
+import { registerAdminRoutes } from './routes/admins.js';
+import { registerDataRoutes } from './routes/data.js';
+import { registerDataSchemaRoutes } from './routes/data-schema.js';
 
-export interface BuildAppOptions {
-  sessionSecret: string;
-  /** 挂载各业务路由组（各 module 提供 register 函数） */
-  registerRoutes: (app: AppApplication) => void;
+export interface BuildAppDeps {
+  systemDb: Kysely<ServerSystemDB>;
 }
 
-/** API 概览（spec 验收：node-erest 自动文档「可访问」）。返回分组与端点约定。 */
-const API_OVERVIEW = {
-  title: 'one-api',
-  description: 'AI native 数据库 HTTP API',
-  groups: {
-    auth: '鉴权：POST /api/auth/login、POST /api/auth/logout、GET /api/auth/me、PUT /api/auth/password（session）',
-    table: '表管理：GET/POST /api/admin/tables、POST /api/admin/tables/import、PUT/DELETE /api/admin/tables/:id、POST /api/admin/tables/:id/refresh（session）',
-    'admin-data': '数据浏览：GET/POST /api/admin/tables/:id/data、GET/PUT/DELETE .../data/:pk、GET .../export（session, internal）',
-    token: 'Token 管理：GET/POST /api/admin/tokens、PUT/DELETE /api/admin/tokens/:id（session）',
-    admin: '管理员管理：GET/POST /api/admin/admins、PUT/DELETE /api/admin/admins/:id（session）',
-    data: '对外数据：GET /api/data/:table、GET .../schema、GET/POST/PUT/DELETE .../records[/:pk]、POST .../incr（Token）',
-    'data-schema': '对外 Schema：POST /api/data/_schema/tables、POST /api/data/_schema/tables/:table/fields（Token, schema action）',
-  },
-  health: 'GET /healthz',
-  authScheme: '管理通道用 session cookie；对外通道用 Authorization: Bearer oa_xxx',
-};
+/** erest 抛出的参数校验错误（普通 Error，message 含 missing required parameter / type mismatch 等） */
+function isERestError(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null) return false;
+  const e = err as { name?: string; message?: string };
+  if (e.name === 'ERestError') return true;
+  const msg = e.message ?? '';
+  return (
+    /missing required parameter/i.test(msg) ||
+    /type mismatch/i.test(msg) ||
+    /unknown parameter/i.test(msg) ||
+    /one of .* is required/i.test(msg)
+  );
+}
 
 /**
- * 装配 @leizm/web app：全局中间件链 + healthz + 业务路由组 + 404/错误兜底。
- * 业务路由组通过 registerRoutes 注入。
+ * 装配 @leizm/web app（纯 erest-first）：
+ * 1. 全局前置中间件：bodyParser + 请求日志
+ * 2. healthz 等非 /api 端点挂在根 /（原生 router，留给 Phase3 web 静态等）
+ * 3. 全部 /api/* 归 erest：建一个 web.Router 作为 erest 的挂载载体，bind 后挂到 app /api
+ * 4. app 级错误中间件（双参数）：统一错误信封 {success:false, error:{code,message}}
  *
- * 中间件顺序（@leizm/web 按函数参数个数区分普通/错误处理中间件）：
- *   1. 请求日志（普通）
- *   2. healthz 路由
- *   3. 业务路由组（registerRoutes）
- *   4. notFound 兜底（普通，路由未匹配时写 404 JSON）
- *   5. errorMiddleware（错误处理，length=2，仅出错时调用）
+ * 中间件链顺序：bodyParser → 日志 → [/healthz 等] → [/api/* (erest)] → [app 级错误中间件]
  */
-export function buildApp(opts: BuildAppOptions): AppApplication {
-  const app = new AppApplication();
+export function buildApp(deps: BuildAppDeps): web.Application {
+  const app = new web.Application();
 
-  // 1. 请求日志（普通中间件：单参数 + 末尾 ctx.next()）
-  app.use('/', (ctx: AppContext) => {
+  // 1. 全局前置中间件
+  app.use('/', web.component.bodyParser.json());
+  app.use('/', web.component.bodyParser.urlencoded({ extended: true }));
+  app.use('/', (ctx) => {
     log.request('%s %s', ctx.request.method, ctx.request.path);
     ctx.next();
   });
 
-  // 2. healthz（健康检查，无需鉴权）+ API 文档概览
-  const health = new AppRouter();
-  health.get(
-    '/healthz',
-    ((ctx) => {
-      ctx.response.json(ok({ status: 'ok' }));
-    }) as Middleware,
-  );
-  health.get(
-    '/api/_docs',
-    ((ctx) => {
-      ctx.response.json(ok(API_OVERVIEW));
-    }) as Middleware,
-  );
-  app.use('/', health);
+  // 2. healthz（非 /api，挂在根；erest 不接管）
+  const rootRouter = new web.Router();
+  rootRouter.get('/healthz', (ctx) => {
+    ctx.response.json(ok({ status: 'ok' }));
+  });
+  app.use('/', rootRouter);
 
-  // 3. 业务路由组（auth/admin/data）由 registerRoutes 挂载
-  opts.registerRoutes(app);
+  // 3. 注册全部路由组到 erest 单例
+  const routeDeps = { systemDb: deps.systemDb, api };
+  registerAuthRoutes(routeDeps);
+  registerTableRoutes(routeDeps);
+  registerAdminDataRoutes(routeDeps);
+  registerTokenRoutes(routeDeps);
+  registerAdminRoutes(routeDeps);
+  registerDataRoutes(routeDeps);
+  registerDataSchemaRoutes(routeDeps);
 
-  // 4. 404 兜底（普通中间件，单参数）
-  app.use('/', notFoundMiddleware);
-  // 5. 错误中间件（错误处理中间件，双参数，仅出错时调用）
-  app.use('/', errorMiddleware);
+  // erest 挂在单一 /api web.Router 下（attachGroupRouter 会 app.use(`/${prefix}`, groupRouter)，
+  // 故 group prefix /auth /admin /data → /api/auth/* /api/admin/* /api/data/*）
+  const apiRouter = new web.Router();
+  api.bind({ adapter: new LeizmWebAdapter(), app: apiRouter, router: web.Router });
+  app.use('/api', apiRouter);
+
+  // 4. app 级错误中间件（双参数）：leizmweb adapter re-throw 后在此统一信封
+  app.use('/', (ctx, err) => {
+    if (!err) {
+      ctx.next();
+      return;
+    }
+    const e = err as Error & { statusCode?: number };
+    if (e instanceof AppError) {
+      log.error('AppError %s: %s', e.code, e.message);
+      if (!ctx.response.headersSent) ctx.response.status(e.statusCode).json(fail(e.code, e.message));
+      return;
+    }
+    if (isERestError(e)) {
+      log.error('ERestError: %s', e.message);
+      if (!ctx.response.headersSent) ctx.response.status(400).json(fail(ErrorCode.VALIDATION_FAIL, e.message));
+      return;
+    }
+    log.error('未知错误: %s', e.stack ?? e.message);
+    if (!ctx.response.headersSent) ctx.response.status(e.statusCode ?? 500).json(fail(ErrorCode.INTERNAL_ERROR, '服务器内部错误'));
+  });
 
   return app;
 }

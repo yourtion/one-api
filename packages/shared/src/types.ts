@@ -52,6 +52,10 @@ export interface TableMeta {
 export interface TokenPermissions {
   tables: string[] | ['*'];
   actions: ('read' | 'write' | 'schema')[];
+  /** admin 通道 token 标志（admin login 签发的 token 带 true；对外通道 false） */
+  admin?: boolean;
+  /** 关联的管理员 id（仅 admin token 带；用于注入 currentUser） */
+  adminId?: number;
 }
 
 /** 统一响应信封 */
