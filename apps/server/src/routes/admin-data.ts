@@ -1,4 +1,3 @@
-import type { HandlerCtx, NextFn } from "./_types.js";
 import { Errors } from '@1api/shared';
 import { getEngine } from '../core/engine.js';
 import { ok } from '../utils/response.js';
@@ -22,7 +21,7 @@ export function registerAdminDataRoutes(deps: RouteDeps): void {
     return meta.name;
   }
 
-  admin.get('/tables/:id/data').title('数据列表').register(async (ctx: HandlerCtx, next: NextFn) => {
+  admin.get('/tables/:id/data').title('数据列表').register(async (ctx, next) => {
     const id = Number(ctx.params['id']);
     const name = await resolveName(id);
     const listOpts = parseListQuery(ctx.query as Record<string, unknown>);
@@ -30,7 +29,7 @@ export function registerAdminDataRoutes(deps: RouteDeps): void {
     return next();
   });
 
-  admin.get('/tables/:id/export').title('导出 CSV').register(async (ctx: HandlerCtx, next: NextFn) => {
+  admin.get('/tables/:id/export').title('导出 CSV').register(async (ctx, next) => {
     const id = Number(ctx.params['id']);
     const name = await resolveName(id);
     const listOpts = parseListQuery(ctx.query as Record<string, unknown>);
@@ -43,7 +42,7 @@ export function registerAdminDataRoutes(deps: RouteDeps): void {
     return next();
   });
 
-  admin.get('/tables/:id/data/:pk').title('单条').register(async (ctx: HandlerCtx, next: NextFn) => {
+  admin.get('/tables/:id/data/:pk').title('单条').register(async (ctx, next) => {
     const id = Number(ctx.params['id']);
     const pk = String(ctx.params['pk']);
     const name = await resolveName(id);
@@ -53,7 +52,7 @@ export function registerAdminDataRoutes(deps: RouteDeps): void {
     return next();
   });
 
-  admin.post('/tables/:id/data').title('新增').register(async (ctx: HandlerCtx, next: NextFn) => {
+  admin.post('/tables/:id/data').title('新增').register(async (ctx, next) => {
     const id = Number(ctx.params['id']);
     const name = await resolveName(id);
     const data = (ctx.body ?? {}) as Record<string, unknown>;
@@ -62,7 +61,7 @@ export function registerAdminDataRoutes(deps: RouteDeps): void {
     return next();
   });
 
-  admin.put('/tables/:id/data/:pk').title('修改').register(async (ctx: HandlerCtx, next: NextFn) => {
+  admin.put('/tables/:id/data/:pk').title('修改').register(async (ctx, next) => {
     const id = Number(ctx.params['id']);
     const pk = String(ctx.params['pk']);
     const name = await resolveName(id);
@@ -72,7 +71,7 @@ export function registerAdminDataRoutes(deps: RouteDeps): void {
     return next();
   });
 
-  admin.delete('/tables/:id/data/:pk').title('删除').register(async (ctx: HandlerCtx, next: NextFn) => {
+  admin.delete('/tables/:id/data/:pk').title('删除').register(async (ctx, next) => {
     const id = Number(ctx.params['id']);
     const pk = String(ctx.params['pk']);
     const name = await resolveName(id);

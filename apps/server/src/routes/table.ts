@@ -1,6 +1,6 @@
-import type { HandlerCtx, NextFn } from "./_types.js";
 import type { Kysely } from 'kysely';
 import type ERest from 'erest';
+import type { Middleware } from 'erest';
 import { isReservedName, Errors, type FieldMetaInput } from '@1api/shared';
 import type { ServerSystemDB } from '../db/types.js';
 import { getEngine } from '../core/engine.js';
@@ -9,8 +9,8 @@ import { requireAdmin } from '../hooks.js';
 
 export interface RouteDeps {
   systemDb: Kysely<ServerSystemDB>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  api: ERest<any, any>;
+  /** erest 实例（T=Middleware 锁定，Raw 不约束——兼容 leizmweb/express 任意 Raw） */
+  api: ERest<Middleware>;
 }
 
 function assertNotReserved(name: string): void {
@@ -25,12 +25,12 @@ export function registerTableRoutes(deps: RouteDeps): void {
   const admin = deps.api.group('admin').before(requireAdmin(deps.systemDb));
   const engine = () => getEngine();
 
-  admin.get('/tables').title('表列表').register(async (ctx: HandlerCtx, next: NextFn) => {
+  admin.get('/tables').title('表列表').register(async (ctx, next) => {
     ctx.reply.json(ok(await engine().metadata.listMetas()));
     return next();
   });
 
-  admin.get('/tables/:id').title('表详情').register(async (ctx: HandlerCtx, next: NextFn) => {
+  admin.get('/tables/:id').title('表详情').register(async (ctx, next) => {
     const id = Number(ctx.params['id']);
     const meta = await engine().metadata.getMeta(id);
     if (!meta) throw Errors.tableNotFound(String(id));
@@ -38,7 +38,7 @@ export function registerTableRoutes(deps: RouteDeps): void {
     return next();
   });
 
-  admin.post('/tables/import').title('导入已有表').register(async (ctx: HandlerCtx, next: NextFn) => {
+  admin.post('/tables/import').title('导入已有表').register(async (ctx, next) => {
     const { name } = (ctx.body ?? {}) as { name?: string };
     if (typeof name !== 'string') throw Errors.validationFail('name 必填');
     assertNotReserved(name);
@@ -47,7 +47,7 @@ export function registerTableRoutes(deps: RouteDeps): void {
     return next();
   });
 
-  admin.post('/tables').title('新建模型').register(async (ctx: HandlerCtx, next: NextFn) => {
+  admin.post('/tables').title('新建模型').register(async (ctx, next) => {
     const body = (ctx.body ?? {}) as {
       name?: string;
       label?: string;
@@ -73,7 +73,7 @@ export function registerTableRoutes(deps: RouteDeps): void {
     return next();
   });
 
-  admin.put('/tables/:id').title('更新元数据').register(async (ctx: HandlerCtx, next: NextFn) => {
+  admin.put('/tables/:id').title('更新元数据').register(async (ctx, next) => {
     const id = Number(ctx.params['id']);
     const body = (ctx.body ?? {}) as {
       label?: string;
@@ -91,7 +91,7 @@ export function registerTableRoutes(deps: RouteDeps): void {
     return next();
   });
 
-  admin.post('/tables/:id/refresh').title('刷新表结构').register(async (ctx: HandlerCtx, next: NextFn) => {
+  admin.post('/tables/:id/refresh').title('刷新表结构').register(async (ctx, next) => {
     const id = Number(ctx.params['id']);
     const meta = await engine().metadata.getMeta(id);
     if (!meta) throw Errors.tableNotFound(String(id));
@@ -99,7 +99,7 @@ export function registerTableRoutes(deps: RouteDeps): void {
     return next();
   });
 
-  admin.delete('/tables/:id').title('取消注册').register(async (ctx: HandlerCtx, next: NextFn) => {
+  admin.delete('/tables/:id').title('取消注册').register(async (ctx, next) => {
     const id = Number(ctx.params['id']);
     // confirm 可来自 body（@leizm/web）或 query（erest 测试脚手架对 DELETE 转 query）
     const confirm = (ctx.body as { confirm?: boolean } | undefined)?.confirm ?? (ctx.query as { confirm?: string })?.['confirm'];

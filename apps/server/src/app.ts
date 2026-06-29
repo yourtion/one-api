@@ -2,6 +2,7 @@ import * as web from '@leizm/web';
 import { LeizmWebAdapter } from '@erest/leizmweb';
 import type { Kysely } from 'kysely';
 import { AppError, ErrorCode } from '@1api/shared';
+import { ERestError } from 'erest';
 import type { ServerSystemDB } from './db/types.js';
 import { api } from './api/instance.js';
 import { fail, ok } from './utils/response.js';
@@ -18,18 +19,9 @@ export interface BuildAppDeps {
   systemDb: Kysely<ServerSystemDB>;
 }
 
-/** erest 抛出的参数校验错误（普通 Error，message 含 missing required parameter / type mismatch 等） */
+/** erest 抛出的参数校验错误 */
 function isERestError(err: unknown): boolean {
-  if (typeof err !== 'object' || err === null) return false;
-  const e = err as { name?: string; message?: string };
-  if (e.name === 'ERestError') return true;
-  const msg = e.message ?? '';
-  return (
-    /missing required parameter/i.test(msg) ||
-    /type mismatch/i.test(msg) ||
-    /unknown parameter/i.test(msg) ||
-    /one of .* is required/i.test(msg)
-  );
+  return err instanceof ERestError;
 }
 
 /**

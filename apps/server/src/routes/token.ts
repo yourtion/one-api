@@ -1,4 +1,3 @@
-import type { HandlerCtx, NextFn } from "./_types.js";
 import { Errors } from '@1api/shared';
 import { ok } from '../utils/response.js';
 import { createTokenStore, tokenToListVO, tokenToCreateVO } from '../middlewares/token-crud.js';
@@ -15,13 +14,13 @@ export function registerTokenRoutes(deps: RouteDeps): void {
   const admin = deps.api.group('admin').before(requireAdmin(deps.systemDb));
   const store = createTokenStore(deps.systemDb);
 
-  admin.get('/tokens').title('Token 列表').register(async (ctx: HandlerCtx, next: NextFn) => {
+  admin.get('/tokens').title('Token 列表').register(async (ctx, next) => {
     const rows = await store.list();
     ctx.reply.json(ok(rows.map(tokenToListVO)));
     return next();
   });
 
-  admin.post('/tokens').title('创建 Token').register(async (ctx: HandlerCtx, next: NextFn) => {
+  admin.post('/tokens').title('创建 Token').register(async (ctx, next) => {
     const body = (ctx.body ?? {}) as { name?: string; permissions?: { tables?: string[]; actions?: string[] } };
     if (typeof body.name !== 'string' || !body.permissions) throw Errors.validationFail('name/permissions 必填');
     const { row, plain } = await store.create({
@@ -35,7 +34,7 @@ export function registerTokenRoutes(deps: RouteDeps): void {
     return next();
   });
 
-  admin.put('/tokens/:id').title('更新 Token').register(async (ctx: HandlerCtx, next: NextFn) => {
+  admin.put('/tokens/:id').title('更新 Token').register(async (ctx, next) => {
     const id = Number(ctx.params['id']);
     const body = (ctx.body ?? {}) as {
       name?: string;
@@ -59,7 +58,7 @@ export function registerTokenRoutes(deps: RouteDeps): void {
     return next();
   });
 
-  admin.delete('/tokens/:id').title('删除 Token').register(async (ctx: HandlerCtx, next: NextFn) => {
+  admin.delete('/tokens/:id').title('删除 Token').register(async (ctx, next) => {
     const id = Number(ctx.params['id']);
     await store.delete(id);
     ctx.reply.json(ok({ success: true }));

@@ -1,4 +1,3 @@
-import type { HandlerCtx, NextFn } from "./_types.js";
 import { Errors } from '@1api/shared';
 import { ok } from '../utils/response.js';
 import { createAdminStore, type AdminRow } from '../middlewares/admin-store.js';
@@ -34,13 +33,13 @@ export function registerAdminRoutes(deps: RouteDeps): void {
   const admin = deps.api.group('admin').before(requireAdmin(deps.systemDb));
   const store = createAdminStore(deps.systemDb);
 
-  admin.get('/admins').title('管理员列表').register(async (ctx: HandlerCtx, next: NextFn) => {
+  admin.get('/admins').title('管理员列表').register(async (ctx, next) => {
     const rows = await store.list();
     ctx.reply.json(ok(rows.map(toVO)));
     return next();
   });
 
-  admin.post('/admins').title('新建管理员').register(async (ctx: HandlerCtx, next: NextFn) => {
+  admin.post('/admins').title('新建管理员').register(async (ctx, next) => {
     const body = (ctx.body ?? {}) as { name?: string; nickname?: string; password?: string };
     if (typeof body.name !== 'string' || typeof body.nickname !== 'string' || typeof body.password !== 'string') {
       throw Errors.validationFail('name/nickname/password 必填');
@@ -55,7 +54,7 @@ export function registerAdminRoutes(deps: RouteDeps): void {
     return next();
   });
 
-  admin.put('/admins/:id').title('更新管理员').register(async (ctx: HandlerCtx, next: NextFn) => {
+  admin.put('/admins/:id').title('更新管理员').register(async (ctx, next) => {
     const id = Number(ctx.params['id']);
     const body = (ctx.body ?? {}) as { nickname?: string; password?: string };
     if (body.nickname !== undefined) await store.updateProfile(id, { nickname: body.nickname });
@@ -67,7 +66,7 @@ export function registerAdminRoutes(deps: RouteDeps): void {
     return next();
   });
 
-  admin.delete('/admins/:id').title('删除管理员').register(async (ctx: HandlerCtx, next: NextFn) => {
+  admin.delete('/admins/:id').title('删除管理员').register(async (ctx, next) => {
     const id = Number(ctx.params['id']);
     const cu = ctx.state['currentUser'] as CurrentAdmin | undefined;
     if (cu?.id === id) throw Errors.validationFail('不可删除自己');

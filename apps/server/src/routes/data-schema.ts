@@ -1,4 +1,3 @@
-import type { HandlerCtx, NextFn } from "./_types.js";
 import { isReservedName, Errors, type FieldMetaInput } from '@1api/shared';
 import { getEngine } from '../core/engine.js';
 import { ok } from '../utils/response.js';
@@ -19,7 +18,7 @@ export function registerDataSchemaRoutes(deps: RouteDeps): void {
     .post('/_schema/tables')
     .title('新建模型（token）')
     .before(checkPermission('schema', { tableFromBody: 'name' }))
-    .register(async (ctx: HandlerCtx, next: NextFn) => {
+    .register(async (ctx, next) => {
       const body = (ctx.body ?? {}) as {
         name?: string;
         label?: string;
@@ -49,7 +48,7 @@ export function registerDataSchemaRoutes(deps: RouteDeps): void {
     .post('/_schema/tables/:table/fields')
     .title('加字段（token）')
     .before(checkPermission('schema', { tableKey: 'table' }))
-    .register(async (ctx: HandlerCtx, next: NextFn) => {
+    .register(async (ctx, next) => {
       const table = String(ctx.params['table']);
       const { field } = (ctx.body ?? {}) as { field?: Record<string, unknown> };
       if (!field) throw Errors.validationFail('field 必填');

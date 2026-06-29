@@ -1,7 +1,7 @@
 import express from 'express';
 import { createERest } from '@erest/express';
 import { ExpressAdapter } from '@erest/express';
-import type { ERest } from 'erest';
+import type { ERest, Middleware } from 'erest';
 import { API_INFO, GROUPS } from '../api/groups.js';
 import { applyEnvelopeFormat } from '../api/format.js';
 import { registerAuthRoutes } from '../routes/auth.js';
@@ -19,11 +19,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 export interface TestSetup {
-  api: ERest<unknown>;
+  api: ERest<Middleware>;
   systemDb: SystemDbHandle['db'];
   businessDbPath: string;
   /** 走 erest initTest 的测试客户端（无鉴权态） */
-  session: () => ReturnType<ERest<unknown>['test']['session']>;
+  session: () => ReturnType<ERest<Middleware>['test']['session']>;
   /** admin/123456 登录，返回 admin token 明文（后续 .headers({authorization: Bearer})） */
   adminToken: () => Promise<string>;
   /** 直接插入一个对外 token 行，返回明文（绕过 API） */

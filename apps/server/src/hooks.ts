@@ -26,7 +26,7 @@ export interface CurrentToken {
  */
 export function requireToken(systemDb: Kysely<ServerSystemDB>): Middleware {
   return async (ctx, next) => {
-    const auth = (ctx.headers['authorization'] as string | undefined) ?? '';
+    const auth = ctx.headers['authorization'] ?? '';
     const m = /^Bearer\s+(oa_\S+)$/i.exec(auth);
     if (!m || !m[1]) throw Errors.invalidToken();
     const resolved = await resolveToken(systemDb, m[1]);
@@ -97,7 +97,9 @@ export function checkPermission(
       tableName = String(ctx.params[tableKey] ?? '');
     }
     const { tables, actions } = token.permissions;
-    const tableOk = (tables as string[]).includes('*') || (tables as string[]).includes(tableName);
+    // tables 类型 string[] | ['*']，includes 需按 string[] 调用避免元组窄化
+    const allTables = tables as readonly string[];
+    const tableOk = allTables.includes('*') || allTables.includes(tableName);
     const actionOk = actions.includes(action);
     if (!tableOk || !actionOk) throw Errors.forbidden();
     return next();

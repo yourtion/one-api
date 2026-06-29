@@ -4,7 +4,6 @@ import { createTokenStore } from '../middlewares/token-crud.js';
 import { comparePassword, hashPassword } from '../utils/password.js';
 import { ok } from '../utils/response.js';
 import { requireAdmin, type CurrentAdmin } from '../hooks.js';
-import type { HandlerCtx, NextFn } from './_types.js';
 import type { RouteDeps } from './table.js';
 
 function toAdminVO(a: AdminRow): CurrentAdmin {
@@ -26,7 +25,7 @@ export function registerAuthRoutes(deps: RouteDeps): void {
   const tokenStore = createTokenStore(deps.systemDb);
   const auth = deps.api.group('auth');
 
-  auth.post('/login').title('登录').register(async (ctx: HandlerCtx, next: NextFn) => {
+  auth.post('/login').title('登录').register(async (ctx, next) => {
     const { name, password } = (ctx.body ?? {}) as { name?: string; password?: string };
     if (typeof name !== 'string' || typeof password !== 'string') {
       throw Errors.validationFail('name/password 必填');
@@ -42,7 +41,7 @@ export function registerAuthRoutes(deps: RouteDeps): void {
     return next();
   });
 
-  auth.get('/me').title('当前管理员').before(requireAdmin(deps.systemDb)).register(async (ctx: HandlerCtx, next: NextFn) => {
+  auth.get('/me').title('当前管理员').before(requireAdmin(deps.systemDb)).register(async (ctx, next) => {
     const cu = ctx.state['currentUser'] as CurrentAdmin;
     const admin = await store.findById(cu.id);
     if (!admin) throw Errors.unauthorized();
@@ -50,7 +49,7 @@ export function registerAuthRoutes(deps: RouteDeps): void {
     return next();
   });
 
-  auth.put('/password').title('修改密码').before(requireAdmin(deps.systemDb)).register(async (ctx: HandlerCtx, next: NextFn) => {
+  auth.put('/password').title('修改密码').before(requireAdmin(deps.systemDb)).register(async (ctx, next) => {
     const cu = ctx.state['currentUser'] as CurrentAdmin;
     const { oldPassword, newPassword } = (ctx.body ?? {}) as { oldPassword?: string; newPassword?: string };
     if (typeof oldPassword !== 'string' || typeof newPassword !== 'string') {
@@ -64,7 +63,7 @@ export function registerAuthRoutes(deps: RouteDeps): void {
     return next();
   });
 
-  auth.post('/logout').title('登出').before(requireAdmin(deps.systemDb)).register(async (_ctx: HandlerCtx, next: NextFn) => {
+  auth.post('/logout').title('登出').before(requireAdmin(deps.systemDb)).register(async (_ctx, next) => {
     // 无状态 token：logout 仅返回成功。撤销名单（token 黑名单）后续增强。
     return next();
   });

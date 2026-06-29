@@ -1,4 +1,3 @@
-import type { HandlerCtx, NextFn } from "./_types.js";
 import { Errors } from '@1api/shared';
 import { getEngine } from '../core/engine.js';
 import { ok } from '../utils/response.js';
@@ -22,7 +21,7 @@ export function registerDataRoutes(deps: RouteDeps): void {
     .get('/:table')
     .title('列表')
     .before(checkPermission('read', { tableKey: 'table' }))
-    .register(async (ctx: HandlerCtx, next: NextFn) => {
+    .register(async (ctx, next) => {
       const table = String(ctx.params['table']);
       const listOpts = parseListQuery(ctx.query as Record<string, unknown>);
       ctx.reply.json(ok(await engine().data.list(table, listOpts)));
@@ -34,7 +33,7 @@ export function registerDataRoutes(deps: RouteDeps): void {
     .get('/:table/schema')
     .title('表结构')
     .before(checkPermission('read', { tableKey: 'table' }))
-    .register(async (ctx: HandlerCtx, next: NextFn) => {
+    .register(async (ctx, next) => {
       const table = String(ctx.params['table']);
       ctx.reply.json(ok(await engine().data.describe(table)));
       return next();
@@ -45,8 +44,8 @@ export function registerDataRoutes(deps: RouteDeps): void {
     .get('/:table/records/:pk')
     .title('单条')
     .before(checkPermission('read', { tableKey: 'table' }))
-    .register(async (ctx: HandlerCtx, next: NextFn) => {
-      const { table, pk } = ctx.params as unknown as { table: string; pk: string };
+    .register(async (ctx, next) => {
+      const table = String(ctx.params["table"]); const pk = String(ctx.params["pk"]);
       const row = await engine().data.get(table, pk);
       if (!row) throw Errors.tableNotFound(table);
       ctx.reply.json(ok(row));
@@ -58,7 +57,7 @@ export function registerDataRoutes(deps: RouteDeps): void {
     .post('/:table/records')
     .title('创建')
     .before(checkPermission('write', { tableKey: 'table' }))
-    .register(async (ctx: HandlerCtx, next: NextFn) => {
+    .register(async (ctx, next) => {
       const table = String(ctx.params['table']);
       const body = (ctx.body ?? {}) as Record<string, unknown>;
       ctx.reply.status(201).json(ok(await engine().data.create(table, body)));
@@ -70,8 +69,8 @@ export function registerDataRoutes(deps: RouteDeps): void {
     .put('/:table/records/:pk')
     .title('更新')
     .before(checkPermission('write', { tableKey: 'table' }))
-    .register(async (ctx: HandlerCtx, next: NextFn) => {
-      const { table, pk } = ctx.params as unknown as { table: string; pk: string };
+    .register(async (ctx, next) => {
+      const table = String(ctx.params["table"]); const pk = String(ctx.params["pk"]);
       const body = (ctx.body ?? {}) as Record<string, unknown>;
       await engine().data.update(table, pk, body);
       ctx.reply.json(ok({ success: true }));
@@ -83,8 +82,8 @@ export function registerDataRoutes(deps: RouteDeps): void {
     .delete('/:table/records/:pk')
     .title('删除')
     .before(checkPermission('write', { tableKey: 'table' }))
-    .register(async (ctx: HandlerCtx, next: NextFn) => {
-      const { table, pk } = ctx.params as unknown as { table: string; pk: string };
+    .register(async (ctx, next) => {
+      const table = String(ctx.params["table"]); const pk = String(ctx.params["pk"]);
       await engine().data.delete(table, pk);
       ctx.reply.json(ok({ success: true }));
       return next();
@@ -95,7 +94,7 @@ export function registerDataRoutes(deps: RouteDeps): void {
     .post('/:table/incr')
     .title('自增')
     .before(checkPermission('write', { tableKey: 'table' }))
-    .register(async (ctx: HandlerCtx, next: NextFn) => {
+    .register(async (ctx, next) => {
       const table = String(ctx.params['table']);
       const { pk, field, count } = (ctx.body ?? {}) as { pk?: string | number; field?: string; count?: number };
       if (pk === undefined || typeof field !== 'string' || typeof count !== 'number') {
