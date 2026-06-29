@@ -1,9 +1,10 @@
+import type { ERest, Middleware } from "erest";
 import { Errors } from '@1api/shared';
 import { getEngine } from '../core/engine.js';
 import { ok } from '../utils/response.js';
 import { parseListQuery } from '../utils/list-query.js';
 import { requireToken, checkPermission } from '../hooks.js';
-import type { RouteDeps } from './table.js';
+import { getSystemDb } from '../core/system-db.js';
 
 /**
  * 对外数据 CRUD /api/data/:table（data 组，Token 鉴权）。
@@ -12,8 +13,8 @@ import type { RouteDeps } from './table.js';
  *
  * 保留段 records/schema/incr 不与合法表名（^[a-z][a-z0-9_]*$）冲突。
  */
-export function registerDataRoutes(deps: RouteDeps): void {
-  const data = deps.api.group('data').before(requireToken(deps.systemDb));
+export function registerDataRoutes(api: ERest<Middleware>): void {
+  const data = api.group('data').before(requireToken(getSystemDb()));
   const engine = () => getEngine();
 
   // —— list ——（read 权限）

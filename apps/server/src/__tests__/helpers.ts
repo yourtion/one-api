@@ -13,6 +13,7 @@ import { registerDataRoutes } from '../routes/data.js';
 import { registerDataSchemaRoutes } from '../routes/data-schema.js';
 import { initSystemDb, type SystemDbHandle } from '../db/system.js';
 import { initEngine, _resetEngine } from '../core/engine.js';
+import { setSystemDb } from '../core/system-db.js';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -48,20 +49,20 @@ export async function setupTest(): Promise<TestSetup> {
   const businessDbPath = join(dir, 'business.db');
 
   const systemDb = await initSystemDb(systemDbPath);
+  setSystemDb(systemDb.db);
   const engine = await initEngine({ businessDbPath, systemDbPath });
 
   const api = createERest({ info: API_INFO, groups: GROUPS, forceGroup: true });
   applyEnvelopeFormat(api);
 
-  // 注册全部路由组
-  const routeDeps = { systemDb: systemDb.db, api };
-  registerAuthRoutes(routeDeps);
-  registerTableRoutes(routeDeps);
-  registerAdminDataRoutes(routeDeps);
-  registerTokenRoutes(routeDeps);
-  registerAdminRoutes(routeDeps);
-  registerDataRoutes(routeDeps);
-  registerDataSchemaRoutes(routeDeps);
+  // 注册全部路由组（传测试用 erest 实例；systemDb 从 getSystemDb() 取）
+  registerAuthRoutes(api);
+  registerTableRoutes(api);
+  registerAdminDataRoutes(api);
+  registerTokenRoutes(api);
+  registerAdminRoutes(api);
+  registerDataRoutes(api);
+  registerDataSchemaRoutes(api);
 
   // 注意：erest group prefix 是 /auth /admin /data（无 /api），故 initTest 也用无 /api 路径。
   const app = express();

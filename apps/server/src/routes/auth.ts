@@ -1,10 +1,11 @@
+import type { ERest, Middleware } from "erest";
 import { Errors } from '@1api/shared';
 import { createAdminStore, type AdminRow } from '../middlewares/admin-store.js';
 import { createTokenStore } from '../middlewares/token-crud.js';
 import { comparePassword, hashPassword } from '../utils/password.js';
 import { ok } from '../utils/response.js';
 import { requireAdmin, type CurrentAdmin } from '../hooks.js';
-import type { RouteDeps } from './table.js';
+import { getSystemDb } from '../core/system-db.js';
 
 function toAdminVO(a: AdminRow): CurrentAdmin {
   return { id: a.id, name: a.name, nickname: a.nickname, mustChangePassword: a.must_change_password === 1 };
@@ -20,10 +21,10 @@ function toAdminVO(a: AdminRow): CurrentAdmin {
  *
  * 路径相对 auth 组前缀 /auth（erest 挂在 /api router 下 → /api/auth/*）。
  */
-export function registerAuthRoutes(deps: RouteDeps): void {
-  const store = createAdminStore(deps.systemDb);
-  const tokenStore = createTokenStore(deps.systemDb);
-  const auth = deps.api.group('auth');
+export function registerAuthRoutes(api: ERest<Middleware>): void {
+  const store = createAdminStore(getSystemDb());
+  const tokenStore = createTokenStore(getSystemDb());
+  const auth = api.group('auth');
 
   auth.post('/login').title('登录').register(async (ctx, next) => {
     const { name, password } = (ctx.body ?? {}) as { name?: string; password?: string };
@@ -41,7 +42,7 @@ export function registerAuthRoutes(deps: RouteDeps): void {
     return next();
   });
 
-  auth.get('/me').title('当前管理员').before(requireAdmin(deps.systemDb)).register(async (ctx, next) => {
+  auth.get('/me').title('当前管理员').before(requireAdmin(getSystemDb())).register(async (ctx, next) => {
     const cu = ctx.state['currentUser'] as CurrentAdmin;
     const admin = await store.findById(cu.id);
     if (!admin) throw Errors.unauthorized();
@@ -49,7 +50,7 @@ export function registerAuthRoutes(deps: RouteDeps): void {
     return next();
   });
 
-  auth.put('/password').title('修改密码').before(requireAdmin(deps.systemDb)).register(async (ctx, next) => {
+  auth.put('/password').title('修改密码').before(requireAdmin(getSystemDb())).register(async (ctx, next) => {
     const cu = ctx.state['currentUser'] as CurrentAdmin;
     const { oldPassword, newPassword } = (ctx.body ?? {}) as { oldPassword?: string; newPassword?: string };
     if (typeof oldPassword !== 'string' || typeof newPassword !== 'string') {
@@ -63,7 +64,7 @@ export function registerAuthRoutes(deps: RouteDeps): void {
     return next();
   });
 
-  auth.post('/logout').title('登出').before(requireAdmin(deps.systemDb)).register(async (_ctx, next) => {
+  auth.post('/logout').title('登出').before(requireAdmin(getSystemDb())).register(async (_ctx, next) => {
     // 无状态 token：logout 仅返回成功。撤销名单（token 黑名单）后续增强。
     return next();
   });

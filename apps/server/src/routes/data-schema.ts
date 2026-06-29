@@ -1,16 +1,17 @@
+import type { ERest, Middleware } from "erest";
 import { isReservedName, Errors, type FieldMetaInput } from '@1api/shared';
 import { getEngine } from '../core/engine.js';
 import { ok } from '../utils/response.js';
 import { requireToken, checkPermission } from '../hooks.js';
-import type { RouteDeps } from './table.js';
+import { getSystemDb } from '../core/system-db.js';
 
 /**
  * 对外 Schema /api/data/_schema/*（data 组，Token schema action）。
  * 路径相对 data 组前缀 /api/data：/_schema/tables、/_schema/tables/:table/fields。
  * _schema 下划线前缀不与合法表名（^[a-z][a-z0-9_]*$）冲突。
  */
-export function registerDataSchemaRoutes(deps: RouteDeps): void {
-  const data = deps.api.group('data').before(requireToken(deps.systemDb));
+export function registerDataSchemaRoutes(api: ERest<Middleware>): void {
+  const data = api.group('data').before(requireToken(getSystemDb()));
   const engine = () => getEngine();
 
   // —— 建表 ——（表名在 body.name，checkPermission 从 body 取）

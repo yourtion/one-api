@@ -1,9 +1,10 @@
+import type { ERest, Middleware } from "erest";
 import { Errors } from '@1api/shared';
 import { getEngine } from '../core/engine.js';
 import { ok } from '../utils/response.js';
 import { parseListQuery } from '../utils/list-query.js';
 import { requireAdmin } from '../hooks.js';
-import type { RouteDeps } from './table.js';
+import { getSystemDb } from '../core/system-db.js';
 
 const INTERNAL = { internal: true } as const;
 
@@ -11,8 +12,8 @@ const INTERNAL = { internal: true } as const;
  * 管理员数据浏览 /api/admin/tables/:id/data（admin 组，internal 通道）。
  * :id 为 table_meta id；internal:true 跳过 is_published/is_editable 校验。
  */
-export function registerAdminDataRoutes(deps: RouteDeps): void {
-  const admin = deps.api.group('admin').before(requireAdmin(deps.systemDb));
+export function registerAdminDataRoutes(api: ERest<Middleware>): void {
+  const admin = api.group('admin').before(requireAdmin(getSystemDb()));
   const engine = () => getEngine();
 
   async function resolveName(id: number): Promise<string> {

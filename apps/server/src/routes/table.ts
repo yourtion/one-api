@@ -1,17 +1,9 @@
-import type { Kysely } from 'kysely';
-import type ERest from 'erest';
-import type { Middleware } from 'erest';
+import type { ERest, Middleware } from "erest";
 import { isReservedName, Errors, type FieldMetaInput } from '@1api/shared';
-import type { ServerSystemDB } from '../db/types.js';
 import { getEngine } from '../core/engine.js';
 import { ok } from '../utils/response.js';
 import { requireAdmin } from '../hooks.js';
-
-export interface RouteDeps {
-  systemDb: Kysely<ServerSystemDB>;
-  /** erest 实例（T=Middleware 锁定，Raw 不约束——兼容 leizmweb/express 任意 Raw） */
-  api: ERest<Middleware>;
-}
+import { getSystemDb } from '../core/system-db.js';
 
 function assertNotReserved(name: string): void {
   if (isReservedName(name)) throw Errors.reservedName(name);
@@ -21,8 +13,8 @@ function assertNotReserved(name: string): void {
  * 表管理 /api/admin/tables（admin 组，admin token 鉴权）。
  * 路径相对于 admin 组前缀 /admin（erest 挂在 /api router 下 → /api/admin/tables）。
  */
-export function registerTableRoutes(deps: RouteDeps): void {
-  const admin = deps.api.group('admin').before(requireAdmin(deps.systemDb));
+export function registerTableRoutes(api: ERest<Middleware>): void {
+  const admin = api.group('admin').before(requireAdmin(getSystemDb()));
   const engine = () => getEngine();
 
   admin.get('/tables').title('表列表').register(async (ctx, next) => {

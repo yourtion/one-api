@@ -1,9 +1,10 @@
+import type { ERest, Middleware } from "erest";
 import { Errors } from '@1api/shared';
 import { ok } from '../utils/response.js';
 import { createAdminStore, type AdminRow } from '../middlewares/admin-store.js';
 import { hashPassword } from '../utils/password.js';
 import { requireAdmin, type CurrentAdmin } from '../hooks.js';
-import type { RouteDeps } from './table.js';
+import { getSystemDb } from '../core/system-db.js';
 
 interface AdminVO {
   id: number;
@@ -29,9 +30,9 @@ function toVO(a: AdminRow): AdminVO {
  * 管理员管理 /api/admin/admins（admin 组，session 鉴权）。
  * 新建/重置密码强制 must_change_password=1；不可删自己。
  */
-export function registerAdminRoutes(deps: RouteDeps): void {
-  const admin = deps.api.group('admin').before(requireAdmin(deps.systemDb));
-  const store = createAdminStore(deps.systemDb);
+export function registerAdminRoutes(api: ERest<Middleware>): void {
+  const admin = api.group('admin').before(requireAdmin(getSystemDb()));
+  const store = createAdminStore(getSystemDb());
 
   admin.get('/admins').title('管理员列表').register(async (ctx, next) => {
     const rows = await store.list();

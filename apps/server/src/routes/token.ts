@@ -1,8 +1,9 @@
+import type { ERest, Middleware } from "erest";
 import { Errors } from '@1api/shared';
 import { ok } from '../utils/response.js';
 import { createTokenStore, tokenToListVO, tokenToCreateVO } from '../middlewares/token-crud.js';
 import { requireAdmin } from '../hooks.js';
-import type { RouteDeps } from './table.js';
+import { getSystemDb } from '../core/system-db.js';
 
 type Actions = Array<'read' | 'write' | 'schema'>;
 
@@ -10,9 +11,9 @@ type Actions = Array<'read' | 'write' | 'schema'>;
  * Token 管理 /api/admin/tokens（admin 组，session 鉴权）。
  * 明文仅创建时返回一次；列表只显 prefix；token_hash 不外泄。
  */
-export function registerTokenRoutes(deps: RouteDeps): void {
-  const admin = deps.api.group('admin').before(requireAdmin(deps.systemDb));
-  const store = createTokenStore(deps.systemDb);
+export function registerTokenRoutes(api: ERest<Middleware>): void {
+  const admin = api.group('admin').before(requireAdmin(getSystemDb()));
+  const store = createTokenStore(getSystemDb());
 
   admin.get('/tokens').title('Token 列表').register(async (ctx, next) => {
     const rows = await store.list();
