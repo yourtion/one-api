@@ -1,10 +1,12 @@
-import type { ERest, Middleware } from "erest";
+import type { ERest, Middleware } from 'erest';
+import { z } from 'erest';
 import { Errors } from '@1api/shared';
 import { getEngine } from '../core/engine.js';
 import { ok } from '../utils/response.js';
 import { parseListQuery } from '../utils/list-query.js';
 import { requireToken, checkPermission } from '../hooks.js';
 import { getSystemDb } from '../core/system-db.js';
+import { ListQuerySchema, TableParam, TablePkParam } from './schemas.js';
 
 /**
  * 对外数据 CRUD /api/data/:table（data 组，Token 鉴权）。
@@ -22,87 +24,95 @@ export function registerDataRoutes(api: ERest<Middleware>): void {
     .get('/:table')
     .title('列表')
     .before(checkPermission('read', { tableKey: 'table' }))
-    .register(async (ctx, next) => {
-      const table = String(ctx.params['table']);
-      const listOpts = parseListQuery(ctx.query as Record<string, unknown>);
-      ctx.reply.json(ok(await engine().data.list(table, listOpts)));
-      return next();
-    });
+    .registerTyped(
+      { params: TableParam, query: ListQuerySchema },
+      async (req, reply) => {
+        const listOpts = parseListQuery(req.query as Record<string, unknown>);
+        reply.json(ok(await engine().data.list(req.params.table, listOpts)));
+      },
+    );
 
   // —— schema（表结构，保留段）——
   data
     .get('/:table/schema')
     .title('表结构')
     .before(checkPermission('read', { tableKey: 'table' }))
-    .register(async (ctx, next) => {
-      const table = String(ctx.params['table']);
-      ctx.reply.json(ok(await engine().data.describe(table)));
-      return next();
-    });
+    .registerTyped(
+      { params: TableParam },
+      async (req, reply) => {
+        reply.json(ok(await engine().data.describe(req.params.table)));
+      },
+    );
 
   // —— get ——
   data
     .get('/:table/records/:pk')
     .title('单条')
     .before(checkPermission('read', { tableKey: 'table' }))
-    .register(async (ctx, next) => {
-      const table = String(ctx.params["table"]); const pk = String(ctx.params["pk"]);
-      const row = await engine().data.get(table, pk);
-      if (!row) throw Errors.tableNotFound(table);
-      ctx.reply.json(ok(row));
-      return next();
-    });
+    .registerTyped(
+      { params: TablePkParam },
+      async (req, reply) => {
+        const row = await engine().data.get(req.params.table, req.params.pk);
+        if (!row) throw Errors.tableNotFound(req.params.table);
+        reply.json(ok(row));
+      },
+    );
 
   // —— create ——（write 权限）
   data
     .post('/:table/records')
     .title('创建')
     .before(checkPermission('write', { tableKey: 'table' }))
-    .register(async (ctx, next) => {
-      const table = String(ctx.params['table']);
-      const body = (ctx.body ?? {}) as Record<string, unknown>;
-      ctx.reply.status(201).json(ok(await engine().data.create(table, body)));
-      return next();
-    });
+    .registerTyped(
+      { params: TableParam, body: z.object({}).catchall(z.unknown()) },
+      async (req, reply) => {
+        reply.status(201).json(ok(await engine().data.create(req.params.table, req.body)));
+      },
+    );
 
   // —— update ——
   data
     .put('/:table/records/:pk')
     .title('更新')
     .before(checkPermission('write', { tableKey: 'table' }))
-    .register(async (ctx, next) => {
-      const table = String(ctx.params["table"]); const pk = String(ctx.params["pk"]);
-      const body = (ctx.body ?? {}) as Record<string, unknown>;
-      await engine().data.update(table, pk, body);
-      ctx.reply.json(ok({ success: true }));
-      return next();
-    });
+    .registerTyped(
+      { params: TablePkParam, body: z.object({}).catchall(z.unknown()) },
+      async (req, reply) => {
+        await engine().data.update(req.params.table, req.params.pk, req.body);
+        reply.json(ok({ success: true }));
+      },
+    );
 
   // —— delete ——
   data
     .delete('/:table/records/:pk')
     .title('删除')
     .before(checkPermission('write', { tableKey: 'table' }))
-    .register(async (ctx, next) => {
-      const table = String(ctx.params["table"]); const pk = String(ctx.params["pk"]);
-      await engine().data.delete(table, pk);
-      ctx.reply.json(ok({ success: true }));
-      return next();
-    });
+    .registerTyped(
+      { params: TablePkParam },
+      async (req, reply) => {
+        await engine().data.delete(req.params.table, req.params.pk);
+        reply.json(ok({ success: true }));
+      },
+    );
 
   // —— incr ——
   data
     .post('/:table/incr')
     .title('自增')
     .before(checkPermission('write', { tableKey: 'table' }))
-    .register(async (ctx, next) => {
-      const table = String(ctx.params['table']);
-      const { pk, field, count } = (ctx.body ?? {}) as { pk?: string | number; field?: string; count?: number };
-      if (pk === undefined || typeof field !== 'string' || typeof count !== 'number') {
-        throw Errors.validationFail('pk/field/count 必填');
-      }
-      await engine().data.incr(table, pk, field, count);
-      ctx.reply.json(ok({ success: true }));
-      return next();
-    });
+    .registerTyped(
+      {
+        params: TableParam,
+        body: z.object({
+          pk: z.union([z.string(), z.number()]),
+          field: z.string(),
+          count: z.number(),
+        }),
+      },
+      async (req, reply) => {
+        await engine().data.incr(req.params.table, req.body.pk, req.body.field, req.body.count);
+        reply.json(ok({ success: true }));
+      },
+    );
 }

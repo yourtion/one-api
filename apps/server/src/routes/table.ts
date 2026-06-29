@@ -1,9 +1,11 @@
-import type { ERest, Middleware } from "erest";
+import type { ERest, Middleware } from 'erest';
+import { z } from 'erest';
 import { isReservedName, Errors, type FieldMetaInput } from '@1api/shared';
 import { getEngine } from '../core/engine.js';
 import { ok } from '../utils/response.js';
 import { requireAdmin } from '../hooks.js';
 import { getSystemDb } from '../core/system-db.js';
+import { CreateModelSchema, IdParam } from './schemas.js';
 
 function assertNotReserved(name: string): void {
   if (isReservedName(name)) throw Errors.reservedName(name);
@@ -11,93 +13,84 @@ function assertNotReserved(name: string): void {
 
 /**
  * 表管理 /api/admin/tables（admin 组，admin token 鉴权）。
- * 路径相对于 admin 组前缀 /admin（erest 挂在 /api router 下 → /api/admin/tables）。
  */
 export function registerTableRoutes(api: ERest<Middleware>): void {
   const admin = api.group('admin').before(requireAdmin(getSystemDb()));
   const engine = () => getEngine();
 
-  admin.get('/tables').title('表列表').register(async (ctx, next) => {
-    ctx.reply.json(ok(await engine().metadata.listMetas()));
-    return next();
+  admin.get('/tables').title('表列表').registerTyped({}, async (_req, reply) => {
+    reply.json(ok(await engine().metadata.listMetas()));
   });
 
-  admin.get('/tables/:id').title('表详情').register(async (ctx, next) => {
-    const id = Number(ctx.params['id']);
-    const meta = await engine().metadata.getMeta(id);
-    if (!meta) throw Errors.tableNotFound(String(id));
-    ctx.reply.json(ok(meta));
-    return next();
-  });
+  admin.get('/tables/:id').title('表详情').registerTyped(
+    { params: IdParam },
+    async (req, reply) => {
+      const meta = await engine().metadata.getMeta(req.params.id);
+      if (!meta) throw Errors.tableNotFound(String(req.params.id));
+      reply.json(ok(meta));
+    },
+  );
 
-  admin.post('/tables/import').title('导入已有表').register(async (ctx, next) => {
-    const { name } = (ctx.body ?? {}) as { name?: string };
-    if (typeof name !== 'string') throw Errors.validationFail('name 必填');
-    assertNotReserved(name);
-    const meta = await engine().schema.importExisting(name);
-    ctx.reply.status(201).json(ok(meta));
-    return next();
-  });
+  admin.post('/tables/import').title('导入已有表').registerTyped(
+    { body: z.object({ name: z.string() }) },
+    async (req, reply) => {
+      assertNotReserved(req.body.name);
+      const meta = await engine().schema.importExisting(req.body.name);
+      reply.status(201).json(ok(meta));
+    },
+  );
 
-  admin.post('/tables').title('新建模型').register(async (ctx, next) => {
-    const body = (ctx.body ?? {}) as {
-      name?: string;
-      label?: string;
-      fields?: Record<string, unknown>[];
-      note?: string | null;
-      autoTimestamps?: boolean;
-    };
-    if (typeof body.name !== 'string' || typeof body.label !== 'string' || !Array.isArray(body.fields)) {
-      throw Errors.validationFail('name/label/fields 必填');
-    }
-    assertNotReserved(body.name);
-    const opts: {
-      name: string;
-      label: string;
-      fields: FieldMetaInput[];
-      note?: string | null;
-      autoTimestamps?: boolean;
-    } = { name: body.name, label: body.label, fields: body.fields as unknown as FieldMetaInput[] };
-    if (body.note !== undefined) opts.note = body.note;
-    if (body.autoTimestamps !== undefined) opts.autoTimestamps = body.autoTimestamps;
-    const meta = await engine().schema.createModel(opts);
-    ctx.reply.status(201).json(ok(meta));
-    return next();
-  });
+  admin.post('/tables').title('新建模型').registerTyped(
+    { body: CreateModelSchema },
+    async (req, reply) => {
+      assertNotReserved(req.body.name);
+      const opts: {
+        name: string; label: string; fields: FieldMetaInput[];
+        note?: string | null; autoTimestamps?: boolean;
+      } = { name: req.body.name, label: req.body.label, fields: req.body.fields as unknown as FieldMetaInput[] };
+      if (req.body.note !== undefined) opts.note = req.body.note;
+      if (req.body.autoTimestamps !== undefined) opts.autoTimestamps = req.body.autoTimestamps;
+      const meta = await engine().schema.createModel(opts);
+      reply.status(201).json(ok(meta));
+    },
+  );
 
-  admin.put('/tables/:id').title('更新元数据').register(async (ctx, next) => {
-    const id = Number(ctx.params['id']);
-    const body = (ctx.body ?? {}) as {
-      label?: string;
-      note?: string | null;
-      isPublished?: boolean;
-      isEditable?: boolean;
-    };
-    const patch: Record<string, unknown> = {};
-    if (body.label !== undefined) patch['label'] = body.label;
-    if (body.note !== undefined) patch['note'] = body.note;
-    if (body.isPublished !== undefined) patch['isPublished'] = body.isPublished;
-    if (body.isEditable !== undefined) patch['isEditable'] = body.isEditable;
-    await engine().metadata.updateMeta(id, patch);
-    ctx.reply.json(ok(await engine().metadata.getMeta(id)));
-    return next();
-  });
+  admin.put('/tables/:id').title('更新元数据').registerTyped(
+    {
+      params: IdParam,
+      body: z.object({
+        label: z.string().optional(),
+        note: z.union([z.string(), z.null()]).optional(),
+        isPublished: z.boolean().optional(),
+        isEditable: z.boolean().optional(),
+      }),
+    },
+    async (req, reply) => {
+      const patch: Record<string, unknown> = {};
+      if (req.body.label !== undefined) patch['label'] = req.body.label;
+      if (req.body.note !== undefined) patch['note'] = req.body.note;
+      if (req.body.isPublished !== undefined) patch['isPublished'] = req.body.isPublished;
+      if (req.body.isEditable !== undefined) patch['isEditable'] = req.body.isEditable;
+      await engine().metadata.updateMeta(req.params.id, patch);
+      reply.json(ok(await engine().metadata.getMeta(req.params.id)));
+    },
+  );
 
-  admin.post('/tables/:id/refresh').title('刷新表结构').register(async (ctx, next) => {
-    const id = Number(ctx.params['id']);
-    const meta = await engine().metadata.getMeta(id);
-    if (!meta) throw Errors.tableNotFound(String(id));
-    ctx.reply.json(ok(await engine().schema.refresh(meta.name)));
-    return next();
-  });
+  admin.post('/tables/:id/refresh').title('刷新表结构').registerTyped(
+    { params: IdParam },
+    async (req, reply) => {
+      const meta = await engine().metadata.getMeta(req.params.id);
+      if (!meta) throw Errors.tableNotFound(String(req.params.id));
+      reply.json(ok(await engine().schema.refresh(meta.name)));
+    },
+  );
 
-  admin.delete('/tables/:id').title('取消注册').register(async (ctx, next) => {
-    const id = Number(ctx.params['id']);
-    // confirm 可来自 body（@leizm/web）或 query（erest 测试脚手架对 DELETE 转 query）
-    const confirm = (ctx.body as { confirm?: boolean } | undefined)?.confirm ?? (ctx.query as { confirm?: string })?.['confirm'];
-    if (!confirm || confirm === 'false') throw Errors.validationFail('需 confirm:true 确认');
-    await engine().metadata.deleteMeta(id);
-    ctx.reply.json(ok({ success: true }));
-    return next();
-  });
+  admin.delete('/tables/:id').title('取消注册').registerTyped(
+    { params: IdParam, query: z.object({ confirm: z.coerce.boolean() }) },
+    async (req, reply) => {
+      if (!req.query.confirm) throw Errors.validationFail('需 confirm:true 确认');
+      await engine().metadata.deleteMeta(req.params.id);
+      reply.json(ok({ success: true }));
+    },
+  );
 }

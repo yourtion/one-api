@@ -1,16 +1,17 @@
-import type { ERest, Middleware } from "erest";
+import type { ERest, Middleware } from 'erest';
+import { z } from 'erest';
 import { Errors } from '@1api/shared';
 import { getEngine } from '../core/engine.js';
 import { ok } from '../utils/response.js';
 import { parseListQuery } from '../utils/list-query.js';
 import { requireAdmin } from '../hooks.js';
 import { getSystemDb } from '../core/system-db.js';
+import { ListQuerySchema, IdParam, IdPkParam } from './schemas.js';
 
 const INTERNAL = { internal: true } as const;
 
 /**
  * 管理员数据浏览 /api/admin/tables/:id/data（admin 组，internal 通道）。
- * :id 为 table_meta id；internal:true 跳过 is_published/is_editable 校验。
  */
 export function registerAdminDataRoutes(api: ERest<Middleware>): void {
   const admin = api.group('admin').before(requireAdmin(getSystemDb()));
@@ -22,64 +23,65 @@ export function registerAdminDataRoutes(api: ERest<Middleware>): void {
     return meta.name;
   }
 
-  admin.get('/tables/:id/data').title('数据列表').register(async (ctx, next) => {
-    const id = Number(ctx.params['id']);
-    const name = await resolveName(id);
-    const listOpts = parseListQuery(ctx.query as Record<string, unknown>);
-    ctx.reply.json(ok(await engine().data.list(name, listOpts, INTERNAL)));
-    return next();
-  });
+  admin.get('/tables/:id/data').title('数据列表').registerTyped(
+    { params: IdParam, query: ListQuerySchema },
+    async (req, reply) => {
+      const name = await resolveName(req.params.id);
+      const listOpts = parseListQuery(req.query as Record<string, unknown>);
+      reply.json(ok(await engine().data.list(name, listOpts, INTERNAL)));
+    },
+  );
 
-  admin.get('/tables/:id/export').title('导出 CSV').register(async (ctx, next) => {
-    const id = Number(ctx.params['id']);
-    const name = await resolveName(id);
-    const listOpts = parseListQuery(ctx.query as Record<string, unknown>);
-    const result = await engine().data.list(name, { ...listOpts, page: 1, size: 10000 }, INTERNAL);
-    const meta = await engine().metadata.getMeta(id);
-    const cols = (meta?.fields ?? []).map((f) => f.name);
-    const header = cols.join(',');
-    const lines = result.rows.map((r) => cols.map((c) => csvCell(r[c])).join(','));
-    ctx.reply.status(200).send([header, ...lines].join('\n'));
-    return next();
-  });
+  admin.get('/tables/:id/export').title('导出 CSV').registerTyped(
+    { params: IdParam, query: ListQuerySchema },
+    async (req, reply) => {
+      const name = await resolveName(req.params.id);
+      const listOpts = parseListQuery(req.query as Record<string, unknown>);
+      const result = await engine().data.list(name, { ...listOpts, page: 1, size: 10000 }, INTERNAL);
+      const meta = await engine().metadata.getMeta(req.params.id);
+      const cols = (meta?.fields ?? []).map((f) => f.name);
+      const header = cols.join(',');
+      const lines = result.rows.map((r) => cols.map((c) => csvCell(r[c])).join(','));
+      reply.status(200).send([header, ...lines].join('\n'));
+    },
+  );
 
-  admin.get('/tables/:id/data/:pk').title('单条').register(async (ctx, next) => {
-    const id = Number(ctx.params['id']);
-    const pk = String(ctx.params['pk']);
-    const name = await resolveName(id);
-    const row = await engine().data.get(name, pk, INTERNAL);
-    if (!row) throw Errors.tableNotFound(name);
-    ctx.reply.json(ok(row));
-    return next();
-  });
+  admin.get('/tables/:id/data/:pk').title('单条').registerTyped(
+    { params: IdPkParam },
+    async (req, reply) => {
+      const name = await resolveName(req.params.id);
+      const row = await engine().data.get(name, req.params.pk, INTERNAL);
+      if (!row) throw Errors.tableNotFound(name);
+      reply.json(ok(row));
+    },
+  );
 
-  admin.post('/tables/:id/data').title('新增').register(async (ctx, next) => {
-    const id = Number(ctx.params['id']);
-    const name = await resolveName(id);
-    const data = (ctx.body ?? {}) as Record<string, unknown>;
-    const row = await engine().data.create(name, data, INTERNAL);
-    ctx.reply.status(201).json(ok(row));
-    return next();
-  });
+  admin.post('/tables/:id/data').title('新增').registerTyped(
+    { params: IdParam, body: z.object({}).catchall(z.unknown()) },
+    async (req, reply) => {
+      const name = await resolveName(req.params.id);
+      const row = await engine().data.create(name, req.body, INTERNAL);
+      reply.status(201).json(ok(row));
+    },
+  );
 
-  admin.put('/tables/:id/data/:pk').title('修改').register(async (ctx, next) => {
-    const id = Number(ctx.params['id']);
-    const pk = String(ctx.params['pk']);
-    const name = await resolveName(id);
-    const patch = (ctx.body ?? {}) as Record<string, unknown>;
-    await engine().data.update(name, pk, patch, INTERNAL);
-    ctx.reply.json(ok({ success: true }));
-    return next();
-  });
+  admin.put('/tables/:id/data/:pk').title('修改').registerTyped(
+    { params: IdPkParam, body: z.object({}).catchall(z.unknown()) },
+    async (req, reply) => {
+      const name = await resolveName(req.params.id);
+      await engine().data.update(name, req.params.pk, req.body, INTERNAL);
+      reply.json(ok({ success: true }));
+    },
+  );
 
-  admin.delete('/tables/:id/data/:pk').title('删除').register(async (ctx, next) => {
-    const id = Number(ctx.params['id']);
-    const pk = String(ctx.params['pk']);
-    const name = await resolveName(id);
-    await engine().data.delete(name, pk, INTERNAL);
-    ctx.reply.json(ok({ success: true }));
-    return next();
-  });
+  admin.delete('/tables/:id/data/:pk').title('删除').registerTyped(
+    { params: IdPkParam },
+    async (req, reply) => {
+      const name = await resolveName(req.params.id);
+      await engine().data.delete(name, req.params.pk, INTERNAL);
+      reply.json(ok({ success: true }));
+    },
+  );
 }
 
 function csvCell(v: unknown): string {

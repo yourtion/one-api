@@ -1,9 +1,11 @@
-import type { ERest, Middleware } from "erest";
+import type { ERest, Middleware } from 'erest';
+import { z } from 'erest';
 import { isReservedName, Errors, type FieldMetaInput } from '@1api/shared';
 import { getEngine } from '../core/engine.js';
 import { ok } from '../utils/response.js';
 import { requireToken, checkPermission } from '../hooks.js';
 import { getSystemDb } from '../core/system-db.js';
+import { CreateModelSchema, TableParam } from './schemas.js';
 
 /**
  * 对外 Schema /api/data/_schema/*（data 组，Token schema action）。
@@ -19,41 +21,32 @@ export function registerDataSchemaRoutes(api: ERest<Middleware>): void {
     .post('/_schema/tables')
     .title('新建模型（token）')
     .before(checkPermission('schema', { tableFromBody: 'name' }))
-    .register(async (ctx, next) => {
-      const body = (ctx.body ?? {}) as {
-        name?: string;
-        label?: string;
-        fields?: Record<string, unknown>[];
-        note?: string | null;
-        autoTimestamps?: boolean;
-      };
-      if (typeof body.name !== 'string' || typeof body.label !== 'string' || !Array.isArray(body.fields)) {
-        throw Errors.validationFail('name/label/fields 必填');
-      }
-      if (isReservedName(body.name)) throw Errors.reservedName(body.name);
-      const opts: {
-        name: string;
-        label: string;
-        fields: FieldMetaInput[];
-        note?: string | null;
-        autoTimestamps?: boolean;
-      } = { name: body.name, label: body.label, fields: body.fields as unknown as FieldMetaInput[] };
-      if (body.note !== undefined) opts.note = body.note;
-      if (body.autoTimestamps !== undefined) opts.autoTimestamps = body.autoTimestamps;
-      ctx.reply.status(201).json(ok(await engine().schema.createModel(opts)));
-      return next();
-    });
+    .registerTyped(
+      { body: CreateModelSchema },
+      async (req, reply) => {
+        if (isReservedName(req.body.name)) throw Errors.reservedName(req.body.name);
+        const opts: {
+          name: string;
+          label: string;
+          fields: FieldMetaInput[];
+          note?: string | null;
+          autoTimestamps?: boolean;
+        } = { name: req.body.name, label: req.body.label, fields: req.body.fields as unknown as FieldMetaInput[] };
+        if (req.body.note !== undefined) opts.note = req.body.note;
+        if (req.body.autoTimestamps !== undefined) opts.autoTimestamps = req.body.autoTimestamps;
+        reply.status(201).json(ok(await engine().schema.createModel(opts)));
+      },
+    );
 
   // —— 加字段 ——
   data
     .post('/_schema/tables/:table/fields')
     .title('加字段（token）')
     .before(checkPermission('schema', { tableKey: 'table' }))
-    .register(async (ctx, next) => {
-      const table = String(ctx.params['table']);
-      const { field } = (ctx.body ?? {}) as { field?: Record<string, unknown> };
-      if (!field) throw Errors.validationFail('field 必填');
-      ctx.reply.json(ok(await engine().schema.addField(table, field as unknown as FieldMetaInput)));
-      return next();
-    });
+    .registerTyped(
+      { params: TableParam, body: z.object({ field: z.record(z.string(), z.unknown()) }) },
+      async (req, reply) => {
+        reply.json(ok(await engine().schema.addField(req.params.table, req.body.field as unknown as FieldMetaInput)));
+      },
+    );
 }

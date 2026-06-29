@@ -1,4 +1,5 @@
-import type { ERest, Middleware } from "erest";
+import type { ERest, Middleware } from 'erest';
+import { z } from 'erest';
 import { Errors } from '@1api/shared';
 import { createAdminStore, type AdminRow } from '../middlewares/admin-store.js';
 import { createTokenStore } from '../middlewares/token-crud.js';
@@ -26,21 +27,20 @@ export function registerAuthRoutes(api: ERest<Middleware>): void {
   const tokenStore = createTokenStore(getSystemDb());
   const auth = api.group('auth');
 
-  auth.post('/login').title('登录').register(async (ctx, next) => {
-    const { name, password } = (ctx.body ?? {}) as { name?: string; password?: string };
-    if (typeof name !== 'string' || typeof password !== 'string') {
-      throw Errors.validationFail('name/password 必填');
-    }
-    const admin = await store.findByName(name);
-    if (!admin || !comparePassword(password, admin.password_hash)) throw Errors.authInvalidCredentials();
-    // 签发 admin token（permissions.admin=true + adminId 关联）
-    const { plain } = await tokenStore.create({
-      name: `admin:${admin.name}`,
-      permissions: { tables: ['*'], actions: ['read', 'write', 'schema'], admin: true, adminId: admin.id },
-    });
-    ctx.reply.json(ok({ token: plain, admin: toAdminVO(admin), mustChangePassword: admin.must_change_password === 1 }));
-    return next();
-  });
+  auth.post('/login').title('登录').registerTyped(
+    { body: z.object({ name: z.string(), password: z.string() }) },
+    async (req, reply) => {
+      const { name, password } = req.body;
+      const admin = await store.findByName(name);
+      if (!admin || !comparePassword(password, admin.password_hash)) throw Errors.authInvalidCredentials();
+      // 签发 admin token（permissions.admin=true + adminId 关联）
+      const { plain } = await tokenStore.create({
+        name: `admin:${admin.name}`,
+        permissions: { tables: ['*'], actions: ['read', 'write', 'schema'], admin: true, adminId: admin.id },
+      });
+      reply.json(ok({ token: plain, admin: toAdminVO(admin), mustChangePassword: admin.must_change_password === 1 }));
+    },
+  );
 
   auth.get('/me').title('当前管理员').before(requireAdmin(getSystemDb())).register(async (ctx, next) => {
     const cu = ctx.state['currentUser'] as CurrentAdmin;
@@ -52,10 +52,9 @@ export function registerAuthRoutes(api: ERest<Middleware>): void {
 
   auth.put('/password').title('修改密码').before(requireAdmin(getSystemDb())).register(async (ctx, next) => {
     const cu = ctx.state['currentUser'] as CurrentAdmin;
-    const { oldPassword, newPassword } = (ctx.body ?? {}) as { oldPassword?: string; newPassword?: string };
-    if (typeof oldPassword !== 'string' || typeof newPassword !== 'string') {
-      throw Errors.validationFail('oldPassword/newPassword 必填');
-    }
+    const { oldPassword, newPassword } = z
+      .object({ oldPassword: z.string(), newPassword: z.string().min(6) })
+      .parse(ctx.body ?? {});
     const admin = await store.findById(cu.id);
     if (!admin || !comparePassword(oldPassword, admin.password_hash)) throw Errors.authInvalidCredentials();
     await store.updatePassword(admin.id, hashPassword(newPassword));
@@ -64,8 +63,8 @@ export function registerAuthRoutes(api: ERest<Middleware>): void {
     return next();
   });
 
-  auth.post('/logout').title('登出').before(requireAdmin(getSystemDb())).register(async (_ctx, next) => {
+  auth.post('/logout').title('登出').before(requireAdmin(getSystemDb())).registerTyped({}, async (_req, reply) => {
     // 无状态 token：logout 仅返回成功。撤销名单（token 黑名单）后续增强。
-    return next();
+    reply.json(ok({ success: true }));
   });
 }
