@@ -7,7 +7,8 @@ import type ERest from 'erest';
  * - success:true → [null, data]：success() 直接返回 data
  * - success:false → [Error(code: message), null]：error() 拿到带 code/message 的 Error
  */
-export function applyEnvelopeFormat(api: ERest<unknown>): void {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function applyEnvelopeFormat(api: ERest<any, any>): void {
   api.setFormatOutput((out: unknown): [Error | null, unknown] => {
     const body = out as { success?: boolean; data?: unknown; error?: { code?: string; message?: string } };
     if (body && typeof body === 'object' && 'success' in body) {

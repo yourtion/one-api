@@ -1,6 +1,7 @@
 import express from 'express';
+import { createERest } from '@erest/express';
 import { ExpressAdapter } from '@erest/express';
-import ERest from 'erest';
+import type { ERest } from 'erest';
 import { API_INFO, GROUPS } from '../api/groups.js';
 import { applyEnvelopeFormat } from '../api/format.js';
 import { registerAuthRoutes } from '../routes/auth.js';
@@ -49,7 +50,7 @@ export async function setupTest(): Promise<TestSetup> {
   const systemDb = await initSystemDb(systemDbPath);
   const engine = await initEngine({ businessDbPath, systemDbPath });
 
-  const api = new ERest<unknown>({ info: API_INFO, groups: GROUPS, forceGroup: true });
+  const api = createERest({ info: API_INFO, groups: GROUPS, forceGroup: true });
   applyEnvelopeFormat(api);
 
   // 注册全部路由组

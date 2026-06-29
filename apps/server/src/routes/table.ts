@@ -1,6 +1,6 @@
-import type ERest from 'erest';
 import type { HandlerCtx, NextFn } from "./_types.js";
 import type { Kysely } from 'kysely';
+import type ERest from 'erest';
 import { isReservedName, Errors, type FieldMetaInput } from '@1api/shared';
 import type { ServerSystemDB } from '../db/types.js';
 import { getEngine } from '../core/engine.js';
@@ -9,7 +9,8 @@ import { requireAdmin } from '../hooks.js';
 
 export interface RouteDeps {
   systemDb: Kysely<ServerSystemDB>;
-  api: ERest<unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  api: ERest<any, any>;
 }
 
 function assertNotReserved(name: string): void {
