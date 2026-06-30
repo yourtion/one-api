@@ -28,7 +28,10 @@ export interface TestSetup {
   /** admin/123456 登录，返回 admin token 明文（后续 .headers({authorization: Bearer})） */
   adminToken: () => Promise<string>;
   /** 直接插入一个对外 token 行，返回明文（绕过 API） */
-  insertToken: (perms: { tables: string[]; actions: string[] }) => Promise<string>;
+  insertToken: (
+    perms: { tables: string[]; actions: string[] },
+    opts?: { isActive?: boolean; expiresAt?: number | null },
+  ) => Promise<string>;
   cleanup: () => Promise<void>;
 }
 
@@ -92,7 +95,10 @@ export async function setupTest(): Promise<TestSetup> {
     return ret.token;
   };
 
-  const insertToken = async (perms: { tables: string[]; actions: string[] }) => {
+  const insertToken = async (
+    perms: { tables: string[]; actions: string[] },
+    opts?: { isActive?: boolean; expiresAt?: number | null },
+  ) => {
     const plain = 'oa_testtoken_' + Math.random().toString(36).slice(2);
     const hash = createHash('sha256').update(plain).digest('hex');
     await systemDb.db
@@ -102,8 +108,8 @@ export async function setupTest(): Promise<TestSetup> {
         token_hash: hash,
         token_prefix: plain.slice(0, 8) + '****',
         permissions: JSON.stringify(perms),
-        is_active: 1,
-        expires_at: null,
+        is_active: opts?.isActive === false ? 0 : 1,
+        expires_at: opts?.expiresAt ?? null,
         last_used_at: null,
         created_at: Date.now(),
         updated_at: Date.now(),

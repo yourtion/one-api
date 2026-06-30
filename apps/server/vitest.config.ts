@@ -14,5 +14,17 @@ export default defineConfig({
   },
   test: {
     include: ['src/**/*.test.ts'],
+    coverage: {
+      provider: 'v8',
+      // core 逻辑计入门槛；装配/入口层（app.ts/index.ts/config，含启动副作用，非纯逻辑）排除
+      include: ['src/routes/**', 'src/middlewares/**', 'src/utils/**', 'src/db/**', 'src/core/**', 'src/api/**'],
+      exclude: ['src/__tests__/**', 'src/types.ts', 'src/db/types.ts'],
+      thresholds: {
+        lines: 90,
+        branches: 85,
+        functions: 90,
+        statements: 90,
+      },
+    },
   },
 });

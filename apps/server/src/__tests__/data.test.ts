@@ -43,6 +43,28 @@ describe('对外 data（Token 鉴权）', () => {
     expect(err).toBeInstanceOf(Error);
   });
 
+  it('过期 token → 401（resolveToken expired 分支）', async () => {
+    const { tableName } = await setupTableAndToken();
+    const expired = await t.insertToken({ tables: ['*'], actions: ['read'] }, { expiresAt: Date.now() - 1000 });
+    const err = await t
+      .session()
+      .get(`/data/${tableName}`)
+      .headers({ authorization: `Bearer ${expired}` })
+      .error();
+    expect(err).toBeInstanceOf(Error);
+  });
+
+  it('未激活 token → 401（resolveToken !isActive 分支）', async () => {
+    const { tableName } = await setupTableAndToken();
+    const inactive = await t.insertToken({ tables: ['*'], actions: ['read'] }, { isActive: false });
+    const err = await t
+      .session()
+      .get(`/data/${tableName}`)
+      .headers({ authorization: `Bearer ${inactive}` })
+      .error();
+    expect(err).toBeInstanceOf(Error);
+  });
+
   it('CRUD 全流程', async () => {
     const { tableName, token } = await setupTableAndToken();
     const auth = { authorization: `Bearer ${token}` };
@@ -147,6 +169,35 @@ describe('对外 data-schema（Token schema action）', () => {
       .post('/data/_schema/tables')
       .headers({ authorization: `Bearer ${tokDeny}` })
       .input({ name: 'denied_tbl', label: 'd', fields: [{ name: 'id', jsonType: 'integer', isPrimary: true }] })
+      .error();
+    expect(err).toBeInstanceOf(Error);
+  });
+
+  it('建表带 note + autoTimestamps（条件挂载分支）', async () => {
+    const token = await t.insertToken({ tables: ['*'], actions: ['schema'] });
+    const auth = { authorization: `Bearer ${token}` };
+    const created = (await t
+      .session()
+      .post('/data/_schema/tables')
+      .headers(auth)
+      .input({
+        name: 'ds_note',
+        label: 'd',
+        fields: [{ name: 'id', jsonType: 'integer', isPrimary: true, isAutoIncrement: true }],
+        note: 'some note',
+        autoTimestamps: true,
+      })
+      .success()) as { name: string };
+    expect(created.name).toBe('ds_note');
+  });
+
+  it('保留字建表 → 拒绝（isReservedName 分支）', async () => {
+    const token = await t.insertToken({ tables: ['*'], actions: ['schema'] });
+    const err = await t
+      .session()
+      .post('/data/_schema/tables')
+      .headers({ authorization: `Bearer ${token}` })
+      .input({ name: 'records', label: 'd', fields: [{ name: 'id', jsonType: 'integer', isPrimary: true }] })
       .error();
     expect(err).toBeInstanceOf(Error);
   });
