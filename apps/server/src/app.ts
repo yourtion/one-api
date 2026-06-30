@@ -1,8 +1,5 @@
 import * as web from '@leizm/web';
 import { LeizmWebAdapter } from '@erest/leizmweb';
-import { AppError, ErrorCode } from '@1api/shared';
-import { ERestError } from 'erest';
-import { fail, ok } from './utils/response.js';
 import { log } from './utils/logger.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerTableRoutes } from './routes/table.js';
@@ -13,17 +10,13 @@ import { registerDataRoutes } from './routes/data.js';
 import { registerDataSchemaRoutes } from './routes/data-schema.js';
 import { api } from './api/instance.js';
 
-/** erest 抛出的参数校验错误 */
-function isERestError(err: unknown): boolean {
-  return err instanceof ERestError;
-}
-
 /**
  * 装配 @leizm/web app（纯 erest-first）：
  * 1. 全局前置中间件：bodyParser + 请求日志
  * 2. healthz 等非 /api 端点挂在根 /（原生 router，留给 Phase3 web 静态等）
  * 3. 全部 /api/* 归 erest：建一个 web.Router 作为 erest 的挂载载体，bind 后挂到 app /api
- * 4. app 级错误中间件（双参数）：统一错误信封 {success:false, error:{code,message}}
+ * 4. app 级错误中间件（双参数）：兜底信封 {success:false, error:{code,message}}
+ *    （erest 路由的错误已由 enveloper 的 error 函数统一包装；此中间件兜底非 erest 路由）
  *
  * routes 直接从全局单例（api / getSystemDb）取依赖，无需传参。
  */
@@ -40,8 +33,8 @@ export function buildApp(): web.Application {
 
   // 2. healthz（非 /api，挂在根）
   const rootRouter = new web.Router();
-  rootRouter.get('/healthz', (ctx) => {
-    ctx.response.json(ok({ status: 'ok' }));
+    rootRouter.get('/healthz', (ctx) => {
+    ctx.response.json({ success: true, data: { status: 'ok' } });
   });
   app.use('/', rootRouter);
 
@@ -65,19 +58,15 @@ export function buildApp(): web.Application {
       ctx.next();
       return;
     }
-    const e = err as Error & { statusCode?: number };
-    if (e instanceof AppError) {
-      log.error('AppError %s: %s', e.code, e.message);
-      if (!ctx.response.headersSent) ctx.response.status(e.statusCode).json(fail(e.code, e.message));
-      return;
+    // erest /api/* 路由的错误已由 enveloper 的 error 函数统一包装（wrapWithEnvelope catch）。
+    // 此中间件兜底非 erest 路由 / 逃逸到 app 级的异常，统一按信封格式响应。
+    const e = err as Error & { statusCode?: number; code?: string };
+    log.error('未捕获错误: %s', e.stack ?? e.message);
+    if (!ctx.response.headersSent) {
+      ctx.response
+        .status(e.statusCode ?? 500)
+        .json({ success: false, error: { code: e.code ?? 'INTERNAL_ERROR', message: e.message ?? '服务器内部错误' } });
     }
-    if (isERestError(e)) {
-      log.error('ERestError: %s', e.message);
-      if (!ctx.response.headersSent) ctx.response.status(e.statusCode ?? 400).json(fail(ErrorCode.VALIDATION_FAIL, e.message));
-      return;
-    }
-    log.error('未知错误: %s', e.stack ?? e.message);
-    if (!ctx.response.headersSent) ctx.response.status(e.statusCode ?? 500).json(fail(ErrorCode.INTERNAL_ERROR, '服务器内部错误'));
   });
 
   return app;

@@ -2,7 +2,6 @@ import type { ERest, Middleware } from 'erest';
 import { z } from 'erest';
 import { Errors } from '@1api/shared';
 import { getEngine } from '../core/engine.js';
-import { ok } from '../utils/response.js';
 import { parseListQuery } from '../utils/list-query.js';
 import { requireToken, checkPermission } from '../hooks.js';
 import { getSystemDb } from '../core/system-db.js';
@@ -26,10 +25,9 @@ export function registerDataRoutes(api: ERest<Middleware>): void {
     .before(checkPermission('read', { tableKey: 'table' }))
     .registerTyped(
       { params: TableParam, query: ListQuerySchema },
-      async (req, reply) => {
+      async (req) => {
         const listOpts = parseListQuery(req.query as Record<string, unknown>);
-        reply.json(ok(await engine().data.list(req.params.table, listOpts)));
-      },
+    return await engine().data.list(req.params.table, listOpts);      },
     );
 
   // —— schema（表结构，保留段）——
@@ -39,9 +37,8 @@ export function registerDataRoutes(api: ERest<Middleware>): void {
     .before(checkPermission('read', { tableKey: 'table' }))
     .registerTyped(
       { params: TableParam },
-      async (req, reply) => {
-        reply.json(ok(await engine().data.describe(req.params.table)));
-      },
+      async (req) => {
+    return await engine().data.describe(req.params.table);      },
     );
 
   // —— get ——
@@ -51,11 +48,10 @@ export function registerDataRoutes(api: ERest<Middleware>): void {
     .before(checkPermission('read', { tableKey: 'table' }))
     .registerTyped(
       { params: TablePkParam },
-      async (req, reply) => {
+      async (req) => {
         const row = await engine().data.get(req.params.table, req.params.pk);
         if (!row) throw Errors.tableNotFound(req.params.table);
-        reply.json(ok(row));
-      },
+    return row;      },
     );
 
   // —— create ——（write 权限）
@@ -64,10 +60,9 @@ export function registerDataRoutes(api: ERest<Middleware>): void {
     .title('创建')
     .before(checkPermission('write', { tableKey: 'table' }))
     .registerTyped(
-      { params: TableParam, body: z.object({}).catchall(z.unknown()) },
-      async (req, reply) => {
-        reply.status(201).json(ok(await engine().data.create(req.params.table, req.body)));
-      },
+      { params: TableParam, body: z.anyObject() },
+      async (req) => {
+    return await engine().data.create(req.params.table, req.body);      },
     );
 
   // —— update ——
@@ -76,11 +71,10 @@ export function registerDataRoutes(api: ERest<Middleware>): void {
     .title('更新')
     .before(checkPermission('write', { tableKey: 'table' }))
     .registerTyped(
-      { params: TablePkParam, body: z.object({}).catchall(z.unknown()) },
-      async (req, reply) => {
+      { params: TablePkParam, body: z.anyObject() },
+      async (req) => {
         await engine().data.update(req.params.table, req.params.pk, req.body);
-        reply.json(ok({ success: true }));
-      },
+    return { success: true };      },
     );
 
   // —— delete ——
@@ -90,10 +84,9 @@ export function registerDataRoutes(api: ERest<Middleware>): void {
     .before(checkPermission('write', { tableKey: 'table' }))
     .registerTyped(
       { params: TablePkParam },
-      async (req, reply) => {
+      async (req) => {
         await engine().data.delete(req.params.table, req.params.pk);
-        reply.json(ok({ success: true }));
-      },
+    return { success: true };      },
     );
 
   // —— incr ——
@@ -110,9 +103,8 @@ export function registerDataRoutes(api: ERest<Middleware>): void {
           count: z.number(),
         }),
       },
-      async (req, reply) => {
+      async (req) => {
         await engine().data.incr(req.params.table, req.body.pk, req.body.field, req.body.count);
-        reply.json(ok({ success: true }));
-      },
+    return { success: true };      },
     );
 }

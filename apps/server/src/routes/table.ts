@@ -2,7 +2,6 @@ import type { ERest, Middleware } from 'erest';
 import { z } from 'erest';
 import { isReservedName, Errors, type FieldMetaInput } from '@1api/shared';
 import { getEngine } from '../core/engine.js';
-import { ok } from '../utils/response.js';
 import { requireAdmin } from '../hooks.js';
 import { getSystemDb } from '../core/system-db.js';
 import { CreateModelSchema, IdParam } from './schemas.js';
@@ -18,31 +17,28 @@ export function registerTableRoutes(api: ERest<Middleware>): void {
   const admin = api.group('admin').before(requireAdmin(getSystemDb()));
   const engine = () => getEngine();
 
-  admin.get('/tables').title('表列表').registerTyped({}, async (_req, reply) => {
-    reply.json(ok(await engine().metadata.listMetas()));
-  });
+  admin.get('/tables').title('表列表').registerTyped({}, async () => {
+    return await engine().metadata.listMetas();  });
 
   admin.get('/tables/:id').title('表详情').registerTyped(
     { params: IdParam },
-    async (req, reply) => {
+    async (req) => {
       const meta = await engine().metadata.getMeta(req.params.id);
       if (!meta) throw Errors.tableNotFound(String(req.params.id));
-      reply.json(ok(meta));
-    },
+    return meta;    },
   );
 
   admin.post('/tables/import').title('导入已有表').registerTyped(
     { body: z.object({ name: z.string() }) },
-    async (req, reply) => {
+    async (req) => {
       assertNotReserved(req.body.name);
       const meta = await engine().schema.importExisting(req.body.name);
-      reply.status(201).json(ok(meta));
-    },
+    return meta;    },
   );
 
   admin.post('/tables').title('新建模型').registerTyped(
     { body: CreateModelSchema },
-    async (req, reply) => {
+    async (req) => {
       assertNotReserved(req.body.name);
       const opts: {
         name: string; label: string; fields: FieldMetaInput[];
@@ -51,8 +47,7 @@ export function registerTableRoutes(api: ERest<Middleware>): void {
       if (req.body.note !== undefined) opts.note = req.body.note;
       if (req.body.autoTimestamps !== undefined) opts.autoTimestamps = req.body.autoTimestamps;
       const meta = await engine().schema.createModel(opts);
-      reply.status(201).json(ok(meta));
-    },
+    return meta;    },
   );
 
   admin.put('/tables/:id').title('更新元数据').registerTyped(
@@ -65,32 +60,29 @@ export function registerTableRoutes(api: ERest<Middleware>): void {
         isEditable: z.boolean().optional(),
       }),
     },
-    async (req, reply) => {
+    async (req) => {
       const patch: Record<string, unknown> = {};
       if (req.body.label !== undefined) patch['label'] = req.body.label;
       if (req.body.note !== undefined) patch['note'] = req.body.note;
       if (req.body.isPublished !== undefined) patch['isPublished'] = req.body.isPublished;
       if (req.body.isEditable !== undefined) patch['isEditable'] = req.body.isEditable;
       await engine().metadata.updateMeta(req.params.id, patch);
-      reply.json(ok(await engine().metadata.getMeta(req.params.id)));
-    },
+    return await engine().metadata.getMeta(req.params.id);    },
   );
 
   admin.post('/tables/:id/refresh').title('刷新表结构').registerTyped(
     { params: IdParam },
-    async (req, reply) => {
+    async (req) => {
       const meta = await engine().metadata.getMeta(req.params.id);
       if (!meta) throw Errors.tableNotFound(String(req.params.id));
-      reply.json(ok(await engine().schema.refresh(meta.name)));
-    },
+    return await engine().schema.refresh(meta.name);    },
   );
 
   admin.delete('/tables/:id').title('取消注册').registerTyped(
     { params: IdParam, query: z.object({ confirm: z.coerce.boolean() }) },
-    async (req, reply) => {
+    async (req) => {
       if (!req.query.confirm) throw Errors.validationFail('需 confirm:true 确认');
       await engine().metadata.deleteMeta(req.params.id);
-      reply.json(ok({ success: true }));
-    },
+    return { success: true };    },
   );
 }

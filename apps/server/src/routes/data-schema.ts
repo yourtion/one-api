@@ -2,7 +2,6 @@ import type { ERest, Middleware } from 'erest';
 import { z } from 'erest';
 import { isReservedName, Errors, type FieldMetaInput } from '@1api/shared';
 import { getEngine } from '../core/engine.js';
-import { ok } from '../utils/response.js';
 import { requireToken, checkPermission } from '../hooks.js';
 import { getSystemDb } from '../core/system-db.js';
 import { CreateModelSchema, TableParam } from './schemas.js';
@@ -23,7 +22,7 @@ export function registerDataSchemaRoutes(api: ERest<Middleware>): void {
     .before(checkPermission('schema', { tableFromBody: 'name' }))
     .registerTyped(
       { body: CreateModelSchema },
-      async (req, reply) => {
+      async (req) => {
         if (isReservedName(req.body.name)) throw Errors.reservedName(req.body.name);
         const opts: {
           name: string;
@@ -34,8 +33,7 @@ export function registerDataSchemaRoutes(api: ERest<Middleware>): void {
         } = { name: req.body.name, label: req.body.label, fields: req.body.fields as unknown as FieldMetaInput[] };
         if (req.body.note !== undefined) opts.note = req.body.note;
         if (req.body.autoTimestamps !== undefined) opts.autoTimestamps = req.body.autoTimestamps;
-        reply.status(201).json(ok(await engine().schema.createModel(opts)));
-      },
+    return await engine().schema.createModel(opts);      },
     );
 
   // —— 加字段 ——
@@ -45,8 +43,7 @@ export function registerDataSchemaRoutes(api: ERest<Middleware>): void {
     .before(checkPermission('schema', { tableKey: 'table' }))
     .registerTyped(
       { params: TableParam, body: z.object({ field: z.record(z.string(), z.unknown()) }) },
-      async (req, reply) => {
-        reply.json(ok(await engine().schema.addField(req.params.table, req.body.field as unknown as FieldMetaInput)));
-      },
+      async (req) => {
+    return await engine().schema.addField(req.params.table, req.body.field as unknown as FieldMetaInput);      },
     );
 }

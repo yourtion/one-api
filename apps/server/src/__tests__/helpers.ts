@@ -3,7 +3,7 @@ import { createERest } from '@erest/express';
 import { ExpressAdapter } from '@erest/express';
 import type { ERest, Middleware } from 'erest';
 import { API_INFO, GROUPS } from '../api/groups.js';
-import { applyEnvelopeFormat } from '../api/format.js';
+import { responseEnvelopers } from '../api/instance.js';
 import { registerAuthRoutes } from '../routes/auth.js';
 import { registerTableRoutes } from '../routes/table.js';
 import { registerAdminDataRoutes } from '../routes/admin-data.js';
@@ -53,7 +53,7 @@ export async function setupTest(): Promise<TestSetup> {
   const engine = await initEngine({ businessDbPath, systemDbPath });
 
   const api = createERest({ info: API_INFO, groups: GROUPS, forceGroup: true });
-  applyEnvelopeFormat(api);
+  api.setResponseEnvelopers(responseEnvelopers);
 
   // 注册全部路由组（传测试用 erest 实例；systemDb 从 getSystemDb() 取）
   registerAuthRoutes(api);

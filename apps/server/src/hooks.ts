@@ -31,7 +31,7 @@ export function requireToken(systemDb: Kysely<ServerSystemDB>): Middleware {
     if (!m || !m[1]) throw Errors.invalidToken();
     const resolved = await resolveToken(systemDb, m[1]);
     if (!resolved) throw Errors.invalidToken();
-    ctx.state['currentToken'] = {
+    ctx.state.currentToken = {
       id: resolved.id,
       name: resolved.name,
       permissions: resolved.permissions,
@@ -55,13 +55,13 @@ export function requireAdmin(systemDb: Kysely<ServerSystemDB>): Middleware {
   return async (ctx, next) => {
     // 先走 token 解析（注入 currentToken）
     await requireBearer(ctx, () => Promise.resolve());
-    const token = ctx.state['currentToken'] as CurrentToken | undefined;
+    const token = ctx.state.currentToken as CurrentToken | undefined;
     if (!token || !token.permissions.admin) throw Errors.unauthorized();
     const adminId = token.permissions.adminId;
     if (typeof adminId !== 'number') throw Errors.unauthorized();
     const admin = await store.findById(adminId);
     if (!admin) throw Errors.unauthorized();
-    ctx.state['currentUser'] = {
+    ctx.state.currentUser = {
       id: admin.id,
       name: admin.name,
       nickname: admin.nickname,
@@ -86,7 +86,7 @@ export function checkPermission(
 ): Middleware {
   const tableKey = opts?.tableKey ?? 'table';
   return async (ctx, next) => {
-    const token = ctx.state['currentToken'] as CurrentToken | undefined;
+    const token = ctx.state.currentToken as CurrentToken | undefined;
     if (!token) throw Errors.invalidToken();
     let tableName: string;
     if (opts?.tableFromBody) {

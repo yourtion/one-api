@@ -1,6 +1,5 @@
 import type { ERest, Middleware } from 'erest';
 import { z } from 'erest';
-import { ok } from '../utils/response.js';
 import { createTokenStore, tokenToListVO, tokenToCreateVO } from '../middlewares/token-crud.js';
 import { requireAdmin } from '../hooks.js';
 import { getSystemDb } from '../core/system-db.js';
@@ -14,10 +13,9 @@ export function registerTokenRoutes(api: ERest<Middleware>): void {
   const admin = api.group('admin').before(requireAdmin(getSystemDb()));
   const store = createTokenStore(getSystemDb());
 
-  admin.get('/tokens').title('Token 列表').registerTyped({}, async (_req, reply) => {
+  admin.get('/tokens').title('Token 列表').registerTyped({}, async () => {
     const rows = await store.list();
-    reply.json(ok(rows.map(tokenToListVO)));
-  });
+    return rows.map(tokenToListVO);  });
 
   admin.post('/tokens').title('创建 Token').registerTyped(
     {
@@ -26,7 +24,7 @@ export function registerTokenRoutes(api: ERest<Middleware>): void {
         permissions: PermissionsSchema,
       }),
     },
-    async (req, reply) => {
+    async (req) => {
       const { row, plain } = await store.create({
         name: req.body.name,
         permissions: {
@@ -34,8 +32,7 @@ export function registerTokenRoutes(api: ERest<Middleware>): void {
           actions: req.body.permissions.actions,
         },
       });
-      reply.status(201).json(ok(tokenToCreateVO(row, plain)));
-    },
+    return tokenToCreateVO(row, plain);    },
   );
 
   admin.put('/tokens/:id').title('更新 Token').registerTyped(
@@ -48,7 +45,7 @@ export function registerTokenRoutes(api: ERest<Middleware>): void {
         expiresAt: z.union([z.number(), z.null()]).optional(),
       }),
     },
-    async (req, reply) => {
+    async (req) => {
       const patch: {
         name?: string;
         permissions?: { tables: string[]; actions: ('read' | 'write' | 'schema')[] };
@@ -61,15 +58,13 @@ export function registerTokenRoutes(api: ERest<Middleware>): void {
       if (req.body.isActive !== undefined) patch.isActive = req.body.isActive;
       if (req.body.expiresAt !== undefined) patch.expiresAt = req.body.expiresAt;
       await store.update(req.params.id, patch);
-      reply.json(ok({ success: true }));
-    },
+    return { success: true };    },
   );
 
   admin.delete('/tokens/:id').title('删除 Token').registerTyped(
     { params: IdParam },
-    async (req, reply) => {
+    async (req) => {
       await store.delete(req.params.id);
-      reply.json(ok({ success: true }));
-    },
+    return { success: true };    },
   );
 }
