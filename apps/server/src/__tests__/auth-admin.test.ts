@@ -293,6 +293,23 @@ describe('admin data 单条操作 + CSV 导出', () => {
     expect(text).toContain('id,name,n'); // 表头
     expect(text).toContain('"csv,row"'); // 含逗号的字段被引号包裹（csvCell 转义分支）
   });
+
+  it('CSV 导出超出上限 → X-Export-Truncated 提示（I5 截断分支）', async () => {
+    // 直接在业务库原生批量插入 >10000 行（事务内很快），触发导出截断提示
+    const Database = (await import('better-sqlite3')).default;
+    const db = new Database(t.businessDbPath);
+    const insert = db.prepare('INSERT INTO ad2 (name, n) VALUES (?, ?)');
+    const tx = db.transaction((count: number) => {
+      for (let i = 0; i < count; i++) insert.run('bulk', i);
+    });
+    tx(10001);
+    db.close();
+    const s = await t.adminSession();
+    const res = await s.get(`/admin/tables/${tableId}/export`).raw();
+    expect(res.status).toBe(200);
+    expect(res.headers['x-export-truncated']).toBe('true');
+    expect(Number(res.headers['x-export-total'])).toBeGreaterThan(10000);
+  });
 });
 
 describe('表详情 + 取消注册（confirm）', () => {
