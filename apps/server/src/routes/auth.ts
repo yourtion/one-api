@@ -12,6 +12,13 @@ function toAdminVO(a: AdminRow): CurrentAdmin {
 }
 
 /**
+ * 固定 dummy bcrypt hash（"password" 的 bcrypt 结果）。
+ * 用户不存在时对它跑一次 comparePassword，消除「用户不存在短路不跑 bcrypt」的时序差，
+ * 避免攻击者通过响应时间枚举有效用户名。结果被丢弃。
+ */
+const DUMMY_HASH = hashPassword('password');
+
+/**
  * 注册 /api/auth/*（全 erest registerTyped + envelope return 模式）。
  *
  * login：校验 name/password → 建 @leizm/web session（regenerate 防 session 固定）→ 写 adminId。
@@ -30,7 +37,10 @@ export function registerAuthRoutes(api: AppApi): void {
     async (req, ctx) => {
       const { name, password } = req.body;
       const admin = await store.findByName(name);
-      if (!admin || !comparePassword(password, admin.password_hash)) throw Errors.authInvalidCredentials();
+      // 用户不存在时也对 dummy hash 跑一次 comparePassword，消除时序侧信道（用户枚举防护）：
+      // 否则用户不存在会短路不跑 bcrypt，响应更快，攻击者可据此枚举有效用户名。
+      const pwdOk = admin ? comparePassword(password, admin.password_hash) : (comparePassword(password, DUMMY_HASH), false);
+      if (!admin || !pwdOk) throw Errors.authInvalidCredentials();
       // 建 session：regenerate 轮换 SID（防 session 固定攻击），写入 adminId
       const sess = ctx.reply.raw.session;
       await sess.regenerate();

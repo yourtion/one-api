@@ -114,6 +114,28 @@ describe('对外 data（Token 鉴权）', () => {
       .error();
     expect(err).toBeInstanceOf(Error);
   });
+
+  it('未发布表对外访问 → 拒绝（is_published 校验，防数据外泄）', async () => {
+    // admin 建表后置 isPublished:false，对外 token（有 read 权限）访问应被拒
+    const s = await t.adminSession();
+    const tableName = `unpublished_${tableSeq++}`;
+    await s
+      .post('/admin/tables')
+      .input({
+        name: tableName,
+        label: 'u',
+        fields: [{ name: 'id', jsonType: 'integer', isPrimary: true, isAutoIncrement: true }],
+      })
+      .success();
+    const meta = (await s.get('/admin/tables').success()) as Array<{ id: number; name: string }>;
+    const id = meta.find((m) => m.name === tableName)!.id;
+    await s.put(`/admin/tables/${id}`).input({ isPublished: false }).success();
+    const token = await t.insertToken({ tables: ['*'], actions: ['read'] });
+    // 对外通道访问未发布表 → 404/error（engine.data.list 默认 internal:false，校验 is_published）
+    const err = await t.session().get(`/data/${tableName}`).headers({ authorization: `Bearer ${token}` }).error();
+    expect(err).toBeInstanceOf(Error);
+    // 对照：admin internal 通道仍可访问（已由 auth-admin.test.ts 覆盖，此处不重复）
+  });
 });
 
 describe('对外 data-schema（Token schema action）', () => {
