@@ -1,6 +1,6 @@
 import type { ERest, Middleware } from 'erest';
 import { z } from 'erest';
-import { isReservedName, Errors, type FieldMetaInput } from '@1api/shared';
+import { isReservedName, Errors, coerceBool, type FieldMetaInput } from '@1api/shared';
 import { getEngine } from '../core/engine.js';
 import { requireAdmin } from '../hooks.js';
 import { getSystemDb } from '../core/system-db.js';
@@ -79,8 +79,10 @@ export function registerTableRoutes(api: ERest<Middleware>): void {
   );
 
   admin.delete('/tables/:id').title('取消注册').registerTyped(
-    { params: IdParam, query: z.object({ confirm: z.coerce.boolean() }) },
+    { params: IdParam, query: z.object({ confirm: coerceBool }) },
     async (req) => {
+      // coerceBool 正确处理字符串 'false'→false（z.coerce.boolean 会误判为 true）。
+      // DELETE 操作用 query 传 confirm（HTTP DELETE body 语义有争议，erest/浏览器普遍不支持）。
       if (!req.query.confirm) throw Errors.validationFail('需 confirm:true 确认');
       await engine().metadata.deleteMeta(req.params.id);
     return { success: true };    },

@@ -79,9 +79,11 @@ describe('admin 通道（session 鉴权）', () => {
     expect(created.name).toBe('posts');
     const list = (await s.get('/admin/tables').success()) as Array<{ name: string }>;
     expect(list.some((x) => x.name === 'posts')).toBe(true);
-    // 删除需 confirm
+    // 删除需 confirm（coerceBool：布尔 false → 拒绝；字符串 'false' 也不应误判为 true）
     const noConfirm = await s.delete(`/admin/tables/${created.id}`).input({ confirm: false }).error();
     expect(noConfirm).toBeInstanceOf(Error);
+    const strFalseRejected = await s.delete(`/admin/tables/${created.id}`).input({ confirm: 'false' }).error();
+    expect(strFalseRejected).toBeInstanceOf(Error);
     const ok = (await s.delete(`/admin/tables/${created.id}`).input({ confirm: true }).success()) as { success: boolean };
     expect(ok.success).toBe(true);
   });
