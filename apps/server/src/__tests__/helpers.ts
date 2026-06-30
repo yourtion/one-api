@@ -1,6 +1,8 @@
 import * as web from '@leizm/web';
 import { LeizmWebAdapter, createERest } from '@erest/leizmweb';
+import { ERestError } from 'erest';
 import type { ERest, Middleware } from 'erest';
+import { AppError } from '@1api/shared';
 import { API_INFO, GROUPS } from '../api/groups.js';
 import { responseEnvelopers } from '../api/instance.js';
 import { registerAuthRoutes } from '../routes/auth.js';
@@ -81,17 +83,18 @@ export async function setupTest(): Promise<TestSetup> {
   const apiRouter = new web.Router();
   api.bind({ adapter: new LeizmWebAdapter(), app: apiRouter, router: web.Router });
   app.use('/', apiRouter);
-  // app 级错误中间件（与生产一致：统一信封）
+  // app 级错误中间件（与生产一致：统一信封；未知错误不泄露内部 message）
   app.use('/', (ctx, err) => {
     if (!err) {
       ctx.next();
       return;
     }
     const e = err as Error & { statusCode?: number; code?: string };
+    const isKnown = err instanceof AppError || err instanceof ERestError;
     if (!ctx.response.headersSent) {
       ctx.response.status(e.statusCode ?? 500).json({
         success: false,
-        error: { code: e.code ?? 'INTERNAL_ERROR', message: e.message ?? '服务器内部错误' },
+        error: { code: e.code ?? 'INTERNAL_ERROR', message: isKnown ? e.message : '服务器内部错误' },
       });
     }
   });

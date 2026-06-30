@@ -1,5 +1,7 @@
 import * as web from '@leizm/web';
 import { LeizmWebAdapter } from '@erest/leizmweb';
+import { ERestError } from 'erest';
+import { AppError } from '@1api/shared';
 import { log } from './utils/logger.js';
 import { applySessionMiddleware } from './middlewares/session.js';
 import { registerAuthRoutes } from './routes/auth.js';
@@ -63,12 +65,15 @@ export function buildApp(): web.Application {
     }
     // erest /api/* 路由的错误已由 enveloper 的 error 函数统一包装（wrapWithEnvelope catch）。
     // 此中间件兜底非 erest 路由 / 逃逸到 app 级的异常，统一按信封格式响应。
+    // 未知错误（非 AppError/ERestError）仅 log.error 记录 stack，响应体不泄露内部 message。
     const e = err as Error & { statusCode?: number; code?: string };
+    const isKnown = err instanceof AppError || err instanceof ERestError;
     log.error('未捕获错误: %s', e.stack ?? e.message);
     if (!ctx.response.headersSent) {
-      ctx.response
-        .status(e.statusCode ?? 500)
-        .json({ success: false, error: { code: e.code ?? 'INTERNAL_ERROR', message: e.message ?? '服务器内部错误' } });
+      ctx.response.status(e.statusCode ?? 500).json({
+        success: false,
+        error: { code: e.code ?? 'INTERNAL_ERROR', message: isKnown ? e.message : '服务器内部错误' },
+      });
     }
   });
 
