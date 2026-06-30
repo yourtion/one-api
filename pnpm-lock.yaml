@@ -24,8 +24,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/shared
       '@erest/leizmweb':
-        specifier: file:../../../../../node-erest/packages/erest-leizmweb
-        version: file:../../../node-erest/packages/erest-leizmweb(@leizm/web@2.7.3(@types/express@5.0.6))(erest@file:../../../node-erest(@types/node@26.0.0))
+        specifier: ^3.2.0
+        version: 3.2.0(@leizm/web@2.7.3(@types/express@5.0.6))(erest@3.2.0(@types/node@26.0.0))
       '@leizm/web':
         specifier: ^2.7.0
         version: 2.7.3(@types/express@5.0.6)
@@ -39,15 +39,15 @@ importers:
         specifier: ^4.3.0
         version: 4.4.3
       erest:
-        specifier: file:../../../../../node-erest
-        version: file:../../../node-erest(@types/node@26.0.0)
+        specifier: ^3.2.0
+        version: 3.2.0(@types/node@26.0.0)
       kysely:
         specifier: ^0.29.0
         version: 0.29.2
     devDependencies:
       '@erest/express':
-        specifier: file:../../../../../node-erest/packages/erest-express
-        version: file:../../../node-erest/packages/erest-express(erest@file:../../../node-erest(@types/node@26.0.0))(express@5.2.1)
+        specifier: ^3.2.0
+        version: 3.2.0(erest@3.2.0(@types/node@26.0.0))(express@5.2.1)
       '@types/bcrypt':
         specifier: ^5.0.0
         version: 5.0.2
@@ -141,17 +141,17 @@ packages:
     resolution: {integrity: sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA==}
     engines: {node: '>=18'}
 
-  '@erest/express@file:../../../node-erest/packages/erest-express':
-    resolution: {directory: ../../../node-erest/packages/erest-express, type: directory}
+  '@erest/express@3.2.0':
+    resolution: {integrity: sha512-J2nfce3hDi8W0+bjOFPUuNlUlOrgo9WvEeS0uk+9rFRNlW1tsP5JKOEEsBdYCDrE6HxrlDWITyX259JGYewydQ==}
     peerDependencies:
-      erest: workspace:^
+      erest: ^3.2.0
       express: ^4.0.0 || ^5.0.0
 
-  '@erest/leizmweb@file:../../../node-erest/packages/erest-leizmweb':
-    resolution: {directory: ../../../node-erest/packages/erest-leizmweb, type: directory}
+  '@erest/leizmweb@3.2.0':
+    resolution: {integrity: sha512-czBbOllhNIX5M3UxPuaWPNYeOlKRDmjfMm89zwxUrRH0pS+vDHP5T18isrZGH3B+pLLbXM8dHxUa1XknxpFA+Q==}
     peerDependencies:
       '@leizm/web': ^2.7.0
-      erest: workspace:^
+      erest: ^3.2.0
 
   '@esbuild/aix-ppc64@0.27.7':
     resolution: {integrity: sha512-EKX3Qwmhz1eMdEJokhALr0YiD0lhQNwDqkPYyPhiSwKrh7/4KRjQc04sZ8db+5DVVnZ1LmbNDI1uAMPEUBnQPg==}
@@ -1047,8 +1047,8 @@ packages:
   end-of-stream@1.4.5:
     resolution: {integrity: sha512-ooEGc6HP26xXq/N+GCGOT0JKCLDGrq2bQUZrQ7gyrJiZANJ/8YDTxTpQBXGMn+WbIQXNVpyWymm7KYVICQnyOg==}
 
-  erest@file:../../../node-erest:
-    resolution: {directory: ../../../node-erest, type: directory}
+  erest@3.2.0:
+    resolution: {integrity: sha512-mm2pnCdydTd8FNTXGPcNwTHtgyhMugKepju6rJ/+ewQ6U40u2SJCmvNLnz3ND1G/0i7r1LaTRuucwTkAo8sZCQ==}
     peerDependencies:
       '@types/node': '*'
 
@@ -1879,15 +1879,15 @@ snapshots:
 
   '@bcoe/v8-coverage@1.0.2': {}
 
-  '@erest/express@file:../../../node-erest/packages/erest-express(erest@file:../../../node-erest(@types/node@26.0.0))(express@5.2.1)':
+  '@erest/express@3.2.0(erest@3.2.0(@types/node@26.0.0))(express@5.2.1)':
     dependencies:
-      erest: file:../../../node-erest(@types/node@26.0.0)
+      erest: 3.2.0(@types/node@26.0.0)
       express: 5.2.1
 
-  '@erest/leizmweb@file:../../../node-erest/packages/erest-leizmweb(@leizm/web@2.7.3(@types/express@5.0.6))(erest@file:../../../node-erest(@types/node@26.0.0))':
+  '@erest/leizmweb@3.2.0(@leizm/web@2.7.3(@types/express@5.0.6))(erest@3.2.0(@types/node@26.0.0))':
     dependencies:
       '@leizm/web': 2.7.3(@types/express@5.0.6)
-      erest: file:../../../node-erest(@types/node@26.0.0)
+      erest: 3.2.0(@types/node@26.0.0)
 
   '@esbuild/aix-ppc64@0.27.7':
     optional: true
@@ -2598,7 +2598,7 @@ snapshots:
     dependencies:
       once: 1.4.0
 
-  erest@file:../../../node-erest(@types/node@26.0.0):
+  erest@3.2.0(@types/node@26.0.0):
     dependencies:
       '@types/node': 26.0.0
       debug: 4.4.3
