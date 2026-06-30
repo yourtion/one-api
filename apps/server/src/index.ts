@@ -15,10 +15,8 @@ async function main(): Promise<void> {
   const engine = await initEngine({ businessDbPath: cfg.businessDbPath, systemDbPath: cfg.systemDbPath });
 
   // 3. app（全局中间件 + erest 单例路由组挂在 /api + app 级错误中间件）
+  // engine/systemDb 已是模块单例（getEngine/getSystemDb），无需挂到 app 上。
   const app = buildApp();
-
-  (app as unknown as { _systemHandle: typeof systemHandle })._systemHandle = systemHandle;
-  (app as unknown as { _engine: typeof engine })._engine = engine;
 
   app.server.listen(cfg.port, '0.0.0.0', async () => {
     const metas = await engine.metadata.listMetas();

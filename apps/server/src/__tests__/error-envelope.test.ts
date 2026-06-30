@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ERestError } from 'erest';
-import { AppError, Errors } from '@1api/shared';
+import { Errors } from '@1api/shared';
 import { setupTest, type TestSetup } from './helpers.js';
 import { responseEnvelopers } from '../api/instance.js';
 
