@@ -12,17 +12,14 @@ afterAll(async () => {
 
 let tableSeq = 0;
 
-/** 用 admin token 建表 + 创建对外 token，返回 { tableName, token }。每个用例独立表名避免冲突。 */
+/** 用 admin session 建表 + 创建对外 token，返回 { tableName, token }。每个用例独立表名避免冲突。 */
 async function setupTableAndToken(
   tablePerms = { tables: ['*'], actions: ['read', 'write'] as string[] },
 ): Promise<{ tableName: string; token: string }> {
-  const adminToken = await t.adminToken();
-  const h = { authorization: `Bearer ${adminToken}` };
+  const s = await t.adminSession();
   const tableName = `posts_${tableSeq++}`;
-  await t
-    .session()
+  await s
     .post('/admin/tables')
-    .headers(h)
     .input({
       name: tableName,
       label: '文章',

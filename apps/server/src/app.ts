@@ -1,6 +1,7 @@
 import * as web from '@leizm/web';
 import { LeizmWebAdapter } from '@erest/leizmweb';
 import { log } from './utils/logger.js';
+import { applySessionMiddleware } from './middlewares/session.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerTableRoutes } from './routes/table.js';
 import { registerAdminDataRoutes } from './routes/admin-data.js';
@@ -26,6 +27,8 @@ export function buildApp(): web.Application {
   // 1. 全局前置中间件
   app.use('/', web.component.bodyParser.json());
   app.use('/', web.component.bodyParser.urlencoded({ extended: true }));
+  // cookieParser + session（admin 通道会话载体；顺序敏感，须在读取 session 的路由前装配）
+  applySessionMiddleware(app);
   app.use('/', (ctx) => {
     log.request('%s %s', ctx.request.method, ctx.request.path);
     ctx.next();

@@ -1,5 +1,6 @@
 import type { Kysely } from 'kysely';
 import type { Middleware } from 'erest';
+import type { Context as LeiContext } from '@leizm/web';
 import { Errors } from '@1api/shared';
 import type { ServerSystemDB } from './db/types.js';
 import { createAdminStore } from './middlewares/admin-store.js';
@@ -45,19 +46,20 @@ export function requireToken(systemDb: Kysely<ServerSystemDB>): Middleware {
 }
 
 /**
- * admin 通道鉴权：requireToken + 校验 token.permissions.admin===true，
+ * admin 通道鉴权：读 @leizm/web session（cookie 载体），校验 session.data.adminId，
  * 据此查询 admin 行注入 ctx.state.currentUser。
- * 失败抛 UNAUTHORIZED（非 admin token / admin 已不存在）。
+ * 失败抛 UNAUTHORIZED（未登录 / session 已销毁 / admin 已不存在）。
+ *
+ * 与对外 requireToken（Bearer）解耦：admin 通道不再依赖 api_token 表，
+ * login 经 @leizm/web session 建立会话，logout 销毁 session。
  */
 export function requireAdmin(systemDb: Kysely<ServerSystemDB>): Middleware {
-  const requireBearer = requireToken(systemDb);
   const store = createAdminStore(systemDb);
   return async (ctx, next) => {
-    // 先走 token 解析（注入 currentToken）
-    await requireBearer(ctx, () => Promise.resolve());
-    const token = ctx.state.currentToken as CurrentToken | undefined;
-    if (!token || !token.permissions.admin) throw Errors.unauthorized();
-    const adminId = token.permissions.adminId;
+    // ctx.reply.raw 是框架无关的 unknown；admin 通道仅在生产 @leizm/web 下挂载，
+    // 此处断言为 LeiContext 以访问 session（requireAdmin 不会挂在 express 等其它 adapter 下）。
+    const raw = ctx.reply.raw as LeiContext;
+    const adminId = raw.session.data['adminId'];
     if (typeof adminId !== 'number') throw Errors.unauthorized();
     const admin = await store.findById(adminId);
     if (!admin) throw Errors.unauthorized();

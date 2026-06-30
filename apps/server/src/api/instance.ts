@@ -1,5 +1,6 @@
 import { createERest } from '@erest/leizmweb';
 import type { ERest, Middleware } from 'erest';
+import type { Context as LeiContext } from '@leizm/web';
 import { API_INFO, GROUPS } from './groups.js';
 import type { CurrentAdmin, CurrentToken } from '../hooks.js';
 
@@ -42,8 +43,8 @@ type AppState = {
   currentUser?: CurrentAdmin;
 };
 
-/** 应用级 ERest 实例类型（含 AppState，供 route 注册函数使用以获得 typed state） */
-export type AppApi = ERest<Middleware, unknown, AppState>;
+/** 应用级 ERest 实例类型（含 AppState + LeizmWebRaw，供 route 注册函数使用以获得 typed state/raw） */
+export type AppApi = ERest<Middleware, LeiContext, AppState>;
 
 /**
  * 全局唯一 ERest 单例（forceGroup 模式 + AppState 类型安全）。

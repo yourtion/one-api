@@ -1,12 +1,11 @@
-import type { ERest, Middleware } from 'erest';
 import { z } from 'erest';
 import { Errors } from '@1api/shared';
 import { createAdminStore, type AdminRow } from '../middlewares/admin-store.js';
-import { createTokenStore } from '../middlewares/token-crud.js';
 import { comparePassword, hashPassword } from '../utils/password.js';
 import { requireAdmin, type CurrentAdmin } from '../hooks.js';
 import type { AppApi } from '../api/instance.js';
 import { getSystemDb } from '../core/system-db.js';
+import { SESSION_NAME } from '../middlewares/session.js';
 
 function toAdminVO(a: AdminRow): CurrentAdmin {
   return { id: a.id, name: a.name, nickname: a.nickname, mustChangePassword: a.must_change_password === 1 };
@@ -15,30 +14,28 @@ function toAdminVO(a: AdminRow): CurrentAdmin {
 /**
  * 注册 /api/auth/*（全 erest registerTyped + envelope return 模式）。
  *
- * login：校验 name/password → 签发一个 admin token（permissions.admin=true）→ 返回明文 token。
- *        客户端后续用 `Authorization: Bearer oa_...` 访问 admin 通道。
- * me/password：before(requireAdmin)（admin token 鉴权）。
- * logout：无状态 token，仅 no-op 返回成功（撤销名单后续增强）。
+ * login：校验 name/password → 建 @leizm/web session（regenerate 防 session 固定）→ 写 adminId。
+ *        客户端后续请求自动带 cookie（admin 通道鉴权由 session 完成，无 Bearer token）。
+ * me/password：before(requireAdmin)（session 鉴权）。
+ * logout：销毁 session + 清除 cookie，凭证立即失效。
  *
  * 路径相对 auth 组前缀 /auth（erest 挂在 /api router 下 → /api/auth/*）。
  */
 export function registerAuthRoutes(api: AppApi): void {
   const store = createAdminStore(getSystemDb());
-  const tokenStore = createTokenStore(getSystemDb());
   const auth = api.group('auth');
 
   auth.post('/login').title('登录').registerTyped(
     { body: z.object({ name: z.string(), password: z.string() }) },
-    async (req) => {
+    async (req, ctx) => {
       const { name, password } = req.body;
       const admin = await store.findByName(name);
       if (!admin || !comparePassword(password, admin.password_hash)) throw Errors.authInvalidCredentials();
-      // 签发 admin token（permissions.admin=true + adminId 关联）
-      const { plain } = await tokenStore.create({
-        name: `admin:${admin.name}`,
-        permissions: { tables: ['*'], actions: ['read', 'write', 'schema'], admin: true, adminId: admin.id },
-      });
-      return { token: plain, admin: toAdminVO(admin), mustChangePassword: admin.must_change_password === 1 };
+      // 建 session：regenerate 轮换 SID（防 session 固定攻击），写入 adminId
+      const sess = ctx.reply.raw.session;
+      await sess.regenerate();
+      sess.data['adminId'] = admin.id;
+      return { admin: toAdminVO(admin), mustChangePassword: admin.must_change_password === 1 };
     },
   );
 
@@ -63,8 +60,10 @@ export function registerAuthRoutes(api: AppApi): void {
     },
   );
 
-  auth.post('/logout').title('登出').before(requireAdmin(getSystemDb())).registerTyped({}, async () => {
-    // 无状态 token：logout 仅返回成功。撤销名单（token 黑名单）后续增强。
+  auth.post('/logout').title('登出').before(requireAdmin(getSystemDb())).registerTyped({}, async (_req, ctx) => {
+    // 销毁 session 存储 + 清除客户端 cookie，凭证立即失效
+    await ctx.reply.raw.session.destroy();
+    ctx.reply.raw.response.clearCookie(SESSION_NAME);
     return { success: true };
   });
 }
