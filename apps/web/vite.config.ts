@@ -19,6 +19,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@1api/shared': resolve(here, '../../packages/shared/src/index.ts'),
+      '@': resolve(here, 'src'),
     },
   },
   build: {
