@@ -15,12 +15,12 @@
   "dependencies": {
     "@1api/engine": "workspace:*",
     "@1api/shared": "workspace:*",
-    "@erest/leizmweb": "link:../../../../../node-erest/packages/erest-leizmweb",
+    "@erest/leizmweb": "^3.2.1",
     "@leizm/web": "^2.7.0",
     "bcrypt": "^5.1.0",
     "better-sqlite3": "^12.0.0",
     "debug": "^4.3.0",
-    "erest": "link:../../../../../node-erest",
+    "erest": "^3.2.1",
     "kysely": "^0.29.0",
     "zod": "^4.4.3"
   },

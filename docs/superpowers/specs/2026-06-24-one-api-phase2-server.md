@@ -21,7 +21,7 @@
 - [ ] 鉴权：未登录访问 admin → 401；无效 token 访问 data → 401；权限不足 → 403
 - [ ] 保留表名（schema/records/incr）导入/新建时被拒绝
 - [ ] 元数据缓存：导入/新建/刷新后立即生效，无需重启
-- [ ] 全局错误中间件：AppError → 统一信封；未知错误 → 500
+- [ ] 全局错误中间件：AppError/ERestError → 统一信封（透传 message）；未知错误 → 500 固定返回「服务器内部错误」（不泄露内部 message）；Zod 校验失败码归一化为 `VALIDATION_FAIL`
 - [ ] node-erest 自动文档（Swagger/Markdown）可访问
 - [ ] Vitest 集成测试覆盖各端点（含鉴权、权限边界、保留表名拒绝）
 
@@ -114,7 +114,7 @@
 | POST | `/api/admin/tables` | 新建模型 `{name,label,fields,note,autoTimestamps}` | `engine.schema.createModel(opts)` |
 | PUT | `/api/admin/tables/:id` | 更新元数据（label/note/is_published/is_editable/字段标记） | `engine.schema.updateMeta(id, patch)` |
 | POST | `/api/admin/tables/:id/refresh` | 刷新表结构 | `engine.schema.refresh(id)` |
-| DELETE | `/api/admin/tables/:id` | 取消注册（不删业务表，需 body `{confirm: true}`） | `engine.schema.deleteMeta(id)` |
+| DELETE | `/api/admin/tables/:id` | 取消注册（不删业务表，需 `?confirm=true` 确认） | `engine.schema.deleteMeta(id)` |
 
 **数据浏览 `src/modules/admin-data/router.ts`**（用 table id，管理员通道）
 
@@ -125,7 +125,7 @@
 | POST | `/api/admin/tables/:id/data` | 新增 | `engine.data.create(name, row, {internal:true})` |
 | PUT | `/api/admin/tables/:id/data/:pk` | 修改 | `engine.data.update(name, pk, patch, {internal:true})` |
 | DELETE | `/api/admin/tables/:id/data/:pk` | 删除 | `engine.data.delete(name, pk, {internal:true})` |
-| GET | `/api/admin/tables/:id/export` | 导出 csv/xlsx | `engine.data.list(name, opts, {internal:true})` + 格式化 |
+| GET | `/api/admin/tables/:id/export` | 导出 CSV（CRLF；>10000 行加 `X-Export-Truncated` 头；经 `reply.markSent()` 绕过 JSON envelope） | `engine.data.list(name, opts, {internal:true})` + CSV 格式化 |
 
 - 路由参数是 table_meta 的 id，handler 内查 name 后调 engine
 - 管理员通道传 `internal:true`，可浏览/编辑未发布表（不受 is_published/is_editable 限制）
@@ -211,23 +211,27 @@
 ## 依赖
 
 ```jsonc
-// apps/server
+// apps/server（实际依赖，见 apps/server/package.json）
 { "dependencies": {
     "@1api/engine": "workspace:*",
     "@1api/shared": "workspace:*",
+    "@erest/leizmweb": "^3.2.1",     // erest 的 @leizm/web adapter（createERest / LeizmWebAdapter）
     "@leizm/web": "^2.7",
-    "erest": "^2.0",
+    "erest": "^3.2.1",                // v3：adapter 模式 + registerTyped + enveloper；peerDep zod
     "kysely": "^0.29",
-    "better-sqlite3": "^11",
+    "better-sqlite3": "^12",          // ^12（Node26 预编译），见 §Phase 1 遗留待办
     "bcrypt": "^5",
     "debug": "^4",
-    "node-xlsx": "^0.23"            // 导出 xlsx
+    "zod": "^4.4.3"                   // erest 3.2+ 列为 peerDependency，server 须直接依赖
   },
   "devDependencies": {
     "tsx": "^4", "typescript": "^5.8", "vitest": "^3",
-    "supertest": "^7"
+    "@vitest/coverage-v8": "^3"
+    // 测试夹具用 @erest/leizmweb（与生产同构），不再用 supertest/express
   } }
 ```
+
+> 注：CSV 导出用原生字符串拼接（零依赖），node-xlsx/xlsx 不在本期；CORS 对外跨域本期不做（见下）。
 
 ## 不在本期范围
 
@@ -235,6 +239,7 @@
 - MCP HTTP 端点（Phase 4）
 - SDK / CLI（Phase 5）
 - 静态文件托管实际产物（Phase 3 构建后才有）
+- **CORS（对外跨域）**：本期不做；admin 同源 + cookie `SameSite=lax` 已满足，对外 `/api/data/*` 跨域留待后续
 
 ## Phase 1 遗留待办（本期需处理）
 
