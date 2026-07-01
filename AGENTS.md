@@ -22,7 +22,8 @@ one-api/
 **分期进度：**
 - Phase 1（shared + engine）：✅ 已完成并合入 main
 - Phase 2（HTTP API 服务）：✅ 已完成（apps/server，worktree 待合入 main）
-- Phase 3（管理界面）/ Phase 4（MCP）/ Phase 5（SDK+CLI）：待启动
+- Phase 3（管理界面 apps/web）：✅ 已完成（worktree 待合入 main）
+- Phase 4（MCP）/ Phase 5（SDK+CLI）：待启动
 
 设计依据见 `docs/superpowers/specs/2026-06-24-one-api-overview.md` + 各 phase spec。
 
@@ -37,6 +38,7 @@ one-api/
 | 测试 | Vitest 3，覆盖率门槛见下 |
 | SQL | kysely（查询）+ better-sqlite3（原生反射/DDL） |
 | Web/API（server） | @leizm/web + **erest ^3.2**（`@erest/leizmweb` adapter + `createERest`），见 §4 |
+| 管理界面（web） | Vue 3.5 + Vite 5 + element-plus 2.11（全量注册）+ Pinia 2 + vue-router 4 + vue-json-ui-editor 3.0.1（数据编辑表单）+ axios 1。美学方向"Control Console"（翡翠青主色 + Manrope/JetBrains Mono） |
 | Zod（server） | zod ^4（erest 3.2+ 列为 peerDependency，**server 须直接依赖**，不能只靠传递） |
 
 **三个"会咬人"的 tsconfig 开关（`tsconfig.base.json`，不要关掉）：**
@@ -75,6 +77,18 @@ pnpm format         # oxfmt --write .
 pnpm --filter @1api/shared test
 pnpm --filter @1api/engine exec vitest run --coverage   # 带覆盖率
 pnpm --filter @1api/engine test src/__tests__/dynamic-sql.test.ts   # 单文件
+```
+
+**Phase 3 起：单进程一键启动（API + 后台）：**
+
+```bash
+pnpm -r build        # web 产物输出到 apps/server/static/admin/
+pnpm start           # = node apps/server/dist/index.js，单进程同时提供 /api/* 和 /admin/* 后台
+# 浏览器打开 http://localhost:3000/admin/  （默认 admin/123456，首登强制改密）
+
+# 开发模式（web 热更新 + server 并行）：
+pnpm --filter @1api/server dev   # 终端1：server on :3000
+pnpm --filter @1api/web dev      # 终端2：vite on :5173，/api 代理到 :3000
 ```
 
 ## 4. 代码规范（项目特有）
@@ -188,3 +202,16 @@ Phase 5（SDK+CLI，依赖 Phase 1+2）
 | **@leizm/web response 无 `send()`** | `ctx.reply.send(text)` 在 leizm/web adapter 下曾映射到不存在的 `response.send()`（可选链静默失败→404） | erest 3.2.1 已修复（send→`response.end`）；自己用 raw 时也用 `response.end(data)`，勿假设有 send。 |
 | **DELETE 参数走 query 非 body** | erest 测试引擎 `.input()` 对 GET/DELETE 归 query（HTTP DELETE body 不通用）；schema 从 body 读会 MISSING_PARAM | DELETE 路由 schema 用 `query`，确认参数经 `coerceBool`（禁 `z.coerce.boolean()`，见 §4）。 |
 | **测试夹具必须与生产同框架** | 曾用 express 测试夹具 + 生产 leizm/web，导致 session/cookie/send 等 leizm/web 专属行为测不到（漏掉 reply.send 404） | 测试夹具用 @erest/leizmweb + leizm/web app + 同款中间件（见 §4 admin 鉴权）。 |
+
+## 附录：Phase 3 踩坑教训（勿重蹈）
+
+| 坑 | 现象 | 对策 |
+|---|---|---|
+| **@leizm/web SPA fallback 不能用裸 `*`** | `app.router.get('/admin/*')` 注册即抛 `TypeError: Unexpected MODIFIER at N, expected END`（path-to-regexp v6 移除了裸星号）；`router.get('/admin/:splat*')` 又不匹配 `/admin/`（空 splat 段） | 用 `app.use('/admin', fallbackMiddleware)` —— use 是前缀匹配，覆盖 `/admin`、`/admin/`、`/admin/**` 全路径。fallback 中间件调 `ctx.response.file(indexHtml)`，放在 `serveStatic({index:false, fallthrough:true})` 之后（fallthrough 让未命中文件的请求 next 到 fallback）。见 `apps/server/src/app.ts`。 |
+| **静态根相对路径算错** | 生产 `node dist/index.js` 时 `import.meta.url` 解析到 `apps/server/dist/`，`resolvePath(here,'static/admin')` 算成 `dist/static/admin`（不存在）→ `/admin/` 404 | web 产物输出在 `apps/server/static/admin`（dist 上一级），默认根用 `resolvePath(here, '../static/admin')`；测试用 `ONE_API_ADMIN_ROOT` 环境变量注入精确路径绕过。 |
+| **vue-json-ui-editor 不支持动态数组** | spec §3.3「用途②」要的"字段行编辑器"（add/remove 一组子对象）该库 v3.0.1 做不到（parser 的 array 分支只支持 enum/oneOf/anyOf 单值选择，不支持 items 子对象编辑） | 经用户授权改用 element-plus 手搓 `FieldRowsEditor.vue`（不可变更新 + 条件挂载可选属性满足 exactOptionalPropertyTypes）。用途①（数据编辑表单）该库正常工作。 |
+| **JsonEditor widget 由 `attrs.type` 决定** | parser.ts 把 `schema.attrs` 整体当 field，`field.type` 决定 widget；`format:'date-time'` parser 不识别（只认 email/uri/regex） | 自写 `schema-adapter.ts`（不复用 shared 的 `fieldsToJsonSchema`，那个无 attrs 扩展）：datetime→`attrs.type='date'`、boolean→`attrs.type='switch'`、string+enum→`attrs.type='select'`。先读 parser.ts 确认映射再写 adapter。 |
+| **新增表单系统字段阻塞 validate** | id/created_at/updated_at 出现在新增表单且 required（nullable=false），用户填不了 → el-form validate 失败、提交无反应 | `fieldsToEditorSchema(fields, {excludeSystem:true})` 新增模式跳过系统管理字段（自增主键/created_at/updated_at）；编辑模式系统字段 readOnly 展示。见 `lib/schema-adapter.ts`。 |
+| **engine 把 boolean/datetime 归一为 integer** | createModel 传 `jsonType:'boolean'`，meta 存回变 `integer`（SQLite 存 INTEGER，反射时 sqliteType→jsonType 反推） | 前端 boolean→switch / datetime→date-picker 分支是防御性代码（实际 meta 里这两类字段 jsonType 都是 integer → el-input-number）。不影响功能，知识：engine 的 jsonType 以 SQLite 存储类型为准。 |
+| **buildApp 内 erest api 是全局单例** | 多次调 buildApp（如每个测试用例各起一个 server）→ registerAuthRoutes 重复注册同名路由抛错 | 静态托管测试在 beforeAll 只 buildApp 一次、复用 server 跑全部用例。setupTest 用 `createERest` 创建新实例避免此问题。 |
+| **`@` alias 必须 vite/vitest/tsconfig 三处对齐** | 只在 vitest 配 `@`→src，vite 和 tsconfig 没配 → 测试过但 `vite build`/`vue-tsc` 找不到 `@/...` | vite.config.ts 的 resolve.alias + tsconfig.json 的 baseUrl/paths + vitest.config.ts 三处都配 `@`→src（见 apps/web Task 1 review 修复）。 |
