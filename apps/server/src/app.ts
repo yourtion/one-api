@@ -64,8 +64,9 @@ export function buildApp(): web.Application {
   app.use('/api', apiRouter);
 
   // 3.5 Phase 3：/admin 静态托管 + SPA history fallback
-  // 静态根：优先环境变量（测试注入），默认 dist 同级 static/admin
-  const ADMIN_ROOT = process.env['ONE_API_ADMIN_ROOT'] ?? resolvePath(here, 'static/admin');
+  // 静态根：优先环境变量（测试注入），默认 dist 上一级 static/admin
+  // （here 指向 apps/server/dist/，web 产物输出到 apps/server/static/admin）
+  const ADMIN_ROOT = process.env['ONE_API_ADMIN_ROOT'] ?? resolvePath(here, '../static/admin');
   if (existsSync(ADMIN_ROOT)) {
     // (a) 真实静态资源（assets 等）；index:false → index.html 由 fallback 统一发
     app.use('/admin', web.component.serveStatic(ADMIN_ROOT, { index: false, fallthrough: true }));
