@@ -61,4 +61,20 @@ describe('auth store', () => {
     await s.logout();
     expect(s.currentUser).toBeNull();
   });
+
+  it('fetchMe 非 401 错误 → 重抛且不清空登录态', async () => {
+    vi.mocked(apiMod.fetchMe).mockRejectedValue(Object.assign(new Error('服务器错误'), { isUnauthorized: false }));
+    const s = useAuthStore();
+    s.currentUser = { id: 1, name: 'admin', nickname: 'A', mustChangePassword: false };
+    await expect(s.fetchMe()).rejects.toThrow('服务器错误');
+    expect(s.currentUser?.id).toBe(1); // 未被清空
+  });
+
+  it('logout 即使 API 失败也清空登录态', async () => {
+    vi.mocked(apiMod.logout).mockRejectedValue(new Error('网络错误'));
+    const s = useAuthStore();
+    s.currentUser = { id: 1, name: 'admin', nickname: 'A', mustChangePassword: false };
+    await expect(s.logout()).rejects.toThrow('网络错误');
+    expect(s.currentUser).toBeNull(); // finally 仍清空
+  });
 });
