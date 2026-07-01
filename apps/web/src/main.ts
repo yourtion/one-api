@@ -1,11 +1,13 @@
 import { createApp } from 'vue';
 import App from './App.vue';
-
-// 最小占位 router（Task 8 替换为真实 router）
 import { createRouter, createWebHistory } from 'vue-router';
+// element-plus 基础样式（组件 JS 由 unplugin 自动按需导入，样式需手动引一次）
+import 'element-plus/dist/index.css';
+import './styles/global.css';
+
 const router = createRouter({
   history: createWebHistory('/admin/'),
-  routes: [{ path: '/', component: { template: '<div>one-api web ok</div>' } }],
+  routes: [{ path: '/', component: { template: '<div class="page"><h1 class="page-title">one-api 控制台</h1></div>' } }],
 });
 
 createApp(App).use(router).mount('#app');

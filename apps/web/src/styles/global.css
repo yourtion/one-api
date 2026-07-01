@@ -1,0 +1,36 @@
+@import './tokens.css';
+
+* { box-sizing: border-box; }
+html, body, #app { height: 100%; margin: 0; }
+body {
+  font-family: var(--font-ui);
+  color: var(--c-text);
+  background: var(--c-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* element-plus 主色覆盖（按其 CSS 变量） */
+:root {
+  --el-color-primary: var(--c-primary);
+  --el-color-primary-light-3: #2dd4bf;
+  --el-color-primary-light-5: #5eead4;
+  --el-color-primary-light-7: #99f6e4;
+  --el-color-primary-light-8: #ccfbf1;
+  --el-color-primary-light-9: #f0fdfa;
+  --el-color-primary-dark-2: var(--c-primary-strong);
+  --el-border-radius-base: var(--radius-sm);
+  --el-font-family: var(--font-ui);
+}
+
+/* 数据/标识符统一用等宽 */
+.mono, .el-table td.code, .el-table th.code { font-family: var(--font-mono); }
+
+/* 页面卡片容器 */
+.page { padding: 24px; }
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.page-title { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+.card { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
+
+/* fade 过渡 */
+.fade-enter-active, .fade-leave-active { transition: opacity 0.15s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
