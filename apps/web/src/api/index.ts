@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { Method } from 'axios';
 import { request, ApiRequestError } from './request.js';
 
 /** 全局 axios 实例：session cookie 携带 + JSON */
@@ -10,8 +11,8 @@ export const http = axios.create({
 });
 
 /** 便捷封装（解包信封） */
-export async function api<T = unknown>(method: string, url: string, cfg?: Parameters<typeof request>[3]): Promise<T> {
-  return request<T>(http, method as never, url, cfg);
+export async function api<T = unknown>(method: Method, url: string, cfg?: Parameters<typeof request>[3]): Promise<T> {
+  return request<T>(http, method, url, cfg);
 }
 
 export { ApiRequestError } from './request.js';
