@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { listTables, listTokens, createToken, updateToken, deleteToken } from '../api/index.js';
 import { formatTs } from '../lib/format.js';
@@ -11,7 +11,10 @@ const tokens = ref<TokenListVO[]>([]);
 const tables = ref<TableMeta[]>([]);
 const loading = ref(false);
 
+// 对话框（创建 / 编辑共用表单）
 const dlgVisible = ref(false);
+const dlgMode = ref<'create' | 'edit'>('create');
+const editingId = ref<number | null>(null);
 const form = reactive({
   name: '',
   tables: [] as string[],
@@ -20,6 +23,8 @@ const form = reactive({
   allowSchema: false,
 });
 const newToken = ref<string | null>(null);
+
+const dlgTitle = computed(() => (dlgMode.value === 'create' ? '新建 Token' : '编辑 Token'));
 
 const allActions: Array<{ value: TokenPermissions['actions'][number]; label: string }> = [
   { value: 'read', label: '读' },
@@ -35,17 +40,63 @@ onMounted(async () => {
   }
 });
 
-function openCreate() {
+function resetForm() {
   form.name = '';
   form.tables = [];
   form.wildcard = false;
   form.actions = ['read'];
   form.allowSchema = false;
   newToken.value = null;
+  editingId.value = null;
+}
+
+function openCreate() {
+  resetForm();
+  dlgMode.value = 'create';
   dlgVisible.value = true;
 }
 
+function openEdit(t: TokenListVO) {
+  resetForm();
+  dlgMode.value = 'edit';
+  editingId.value = t.id;
+  form.name = t.name;
+  const wildcard = t.permissions.tables.includes('*');
+  form.wildcard = wildcard;
+  form.tables = wildcard ? [] : t.permissions.tables;
+  form.actions = t.permissions.actions.filter((a) => a !== 'schema') as TokenPermissions['actions'];
+  form.allowSchema = t.permissions.actions.includes('schema');
+  dlgVisible.value = true;
+}
+
+function buildPerms(): TokenPermissions {
+  return {
+    tables: form.wildcard ? ['*'] : form.tables,
+    actions: form.allowSchema ? [...form.actions, 'schema'] : form.actions,
+  };
+}
+
 async function onSubmit() {
+  if (dlgMode.value === 'edit') {
+    if (!form.name) {
+      ElMessage.warning('请填写名称');
+      return;
+    }
+    if (!form.wildcard && form.tables.length === 0) {
+      ElMessage.warning('请选择表或勾选全部');
+      return;
+    }
+    try {
+      await updateToken(editingId.value!, { name: form.name, permissions: buildPerms() });
+      tokens.value = await listTokens();
+      ElMessage.success('已更新');
+      dlgVisible.value = false;
+    } catch (e) {
+      ElMessage.error((e as Error).message);
+    }
+    return;
+  }
+  // create
   if (!form.name) {
     ElMessage.warning('请填写名称');
     return;
@@ -54,12 +105,8 @@ async function onSubmit() {
     ElMessage.warning('请选择表或勾选全部');
     return;
   }
-  const perms: TokenPermissions = {
-    tables: form.wildcard ? ['*'] : form.tables,
-    actions: form.allowSchema ? [...form.actions, 'schema'] : form.actions,
-  };
   try {
-    const r = await createToken(form.name, perms);
+    const r = await createToken(form.name, buildPerms());
     newToken.value = r.token;
     tokens.value = await listTokens();
     ElMessage.success('已创建，请立即复制明文');
@@ -121,14 +168,17 @@ async function copyToken() {
         <el-table-column label="创建时间" width="150">
           <template #default="{ row }">{{ formatTs(row.created_at) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="90" fixed="right">
-          <template #default="{ row }"><el-button link type="danger" @click="onDelete(row)">删除</el-button></template>
+        <el-table-column label="操作" width="140" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
+            <el-button link type="danger" @click="onDelete(row)">删除</el-button>
+          </template>
         </el-table-column>
       </el-table>
       <EmptyState v-else text="还没有 Token" />
     </div>
 
-    <el-dialog v-model="dlgVisible" title="新建 Token" width="520px">
+    <el-dialog v-model="dlgVisible" :title="dlgTitle" width="520px">
       <el-form label-width="90px">
         <el-form-item label="名称"><el-input v-model="form.name" /></el-form-item>
         <el-form-item label="全部表"><el-switch v-model="form.wildcard" /></el-form-item>
@@ -157,7 +207,9 @@ async function copyToken() {
 
       <template #footer>
         <el-button @click="dlgVisible = false">{{ newToken ? '我已保存' : '取消' }}</el-button>
-        <el-button v-if="!newToken" type="primary" @click="onSubmit">创建</el-button>
+        <el-button v-if="!newToken" type="primary" @click="onSubmit">
+          {{ dlgMode === 'create' ? '创建' : '保存' }}
+        </el-button>
       </template>
     </el-dialog>
   </div>

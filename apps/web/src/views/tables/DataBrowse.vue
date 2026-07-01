@@ -22,6 +22,9 @@ const page = ref(1);
 const size = ref(20);
 const order = ref('');
 const q = ref('');
+// 字段精确过滤（field__eq=value），仅对字符串字段提供输入
+const filters = ref<Record<string, string>>({});
+const showFilters = ref(false);
 
 // 弹窗：新增/编辑（vue-json-ui-editor）
 const dlgVisible = ref(false);
@@ -33,6 +36,10 @@ const formModel = ref<Record<string, unknown>>({});
 
 const visibleFields = computed(() => (meta.value?.fields ?? []).filter((f) => !f.isHidden));
 const canEdit = computed(() => meta.value?.isEditable ?? false);
+// 可过滤字段：字符串类（含主键 integer 用 eq 精确匹配也合理）
+const filterableFields = computed(() =>
+  (meta.value?.fields ?? []).filter((f) => !f.isHidden && (f.jsonType === 'string' || f.jsonType === 'integer')),
+);
 
 // 新增模式：排除系统管理字段（自增主键/created_at/updated_at），避免 validate 失败
 const createSchema = computed(() =>
@@ -50,6 +57,10 @@ async function load() {
     const query: Record<string, unknown> = { page: page.value, size: size.value };
     if (order.value) query['order'] = order.value;
     if (q.value) query['q'] = q.value;
+    // 字段精确过滤：field__eq=value
+    for (const [k, v] of Object.entries(filters.value)) {
+      if (v) query[`${k}__eq`] = v;
+    }
     const res = await listData<Record<string, unknown>>(id(), query);
     rows.value = res.rows;
     total.value = res.total;
@@ -140,7 +151,22 @@ watch([page, size], load);
         <el-option label="主键 倒序" :value="`${meta?.primaryKey}:desc`" />
         <el-option label="主键 正序" :value="`${meta?.primaryKey}:asc`" />
       </el-select>
+      <el-button v-if="filterableFields.length" link type="primary" @click="showFilters = !showFilters">
+        {{ showFilters ? '收起过滤' : '字段过滤' }}
+      </el-button>
       <el-button @click="load">查询</el-button>
+    </div>
+
+    <div v-if="showFilters && filterableFields.length" class="card filter-bar" style="margin-bottom: 16px">
+      <el-input
+        v-for="f in filterableFields"
+        :key="f.name"
+        v-model="filters[f.name]"
+        :placeholder="`${f.label || f.name} 精确匹配`"
+        style="width: 200px"
+        @keyup.enter="load"
+      />
+      <el-button @click="load">应用</el-button>
     </div>
 
     <div class="card">
