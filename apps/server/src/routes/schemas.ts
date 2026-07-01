@@ -1,4 +1,4 @@
-import { z } from 'erest';
+import { z } from 'zod';
 
 // —— 共享 Zod schema（多 route 文件复用）——
 

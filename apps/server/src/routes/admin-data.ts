@@ -33,8 +33,10 @@ export function registerAdminDataRoutes(api: AppApi): void {
   admin.get('/tables/:id/export').title('导出 CSV').registerTyped(
     { params: IdParam, query: ListQuerySchema },
     async (req, ctx) => {
-      // CSV 导出绕过 envelope（非 JSON）：直接用原生 response.send 写文本，不 return data。
-      // wrapWithEnvelope 检测到 handler 未置 __returned（自行写响应），不会二次包装。
+      // CSV 导出绕过 envelope（非 JSON）：经 raw 手动写完整响应后调 ctx.reply.markSent()，
+      // 显式告知 enveloper 跳过自动包装（registerTyped 的 handler return 后 enveloper 默认会
+      // 再包一层 json）。此前靠「response 已 end 后 json() 写不动」兜底是脆弱巧合，markSent 是
+      // erest 提供的公开逃生舱（erest v3.2.1+）。
       const EXPORT_SIZE_LIMIT = 10000;
       const id = req.params.id;
       const name = await resolveName(id);
@@ -53,6 +55,7 @@ export function registerAdminDataRoutes(api: AppApi): void {
       // leizm/web 原生 response 无 send()，用 end(data) 写 body 并结束响应
       ctx.reply.raw.response.setHeader('Content-Type', 'text/csv; charset=utf-8');
       ctx.reply.raw.response.status(200).end([header, ...lines].join('\r\n'));
+      ctx.reply.markSent();
     },
   );
 
