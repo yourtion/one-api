@@ -21,7 +21,8 @@ one-api/
 
 **分期进度：**
 - Phase 1（shared + engine）：✅ 已完成并合入 main
-- Phase 2（HTTP API 服务）/ Phase 3（管理界面）/ Phase 4（MCP）/ Phase 5（SDK+CLI）：待启动
+- Phase 2（HTTP API 服务）：✅ 已完成（apps/server，worktree 待合入 main）
+- Phase 3（管理界面）/ Phase 4（MCP）/ Phase 5（SDK+CLI）：待启动
 
 设计依据见 `docs/superpowers/specs/2026-06-24-one-api-overview.md` + 各 phase spec。
 
@@ -35,6 +36,8 @@ one-api/
 | Lint/Format | oxlint + oxfmt（全 workspace 统一） |
 | 测试 | Vitest 3，覆盖率门槛见下 |
 | SQL | kysely（查询）+ better-sqlite3（原生反射/DDL） |
+| Web/API（server） | @leizm/web + **erest ^3.2**（`@erest/leizmweb` adapter + `createERest`），见 §4 |
+| Zod（server） | zod ^4（erest 3.2+ 列为 peerDependency，**server 须直接依赖**，不能只靠传递） |
 
 **三个"会咬人"的 tsconfig 开关（`tsconfig.base.json`，不要关掉）：**
 
@@ -44,16 +47,17 @@ one-api/
 
 ## 3. 开发命令
 
-**⚠️ 当前正确工作流（Phase 1 遗留，Phase 2 待修）：**
+**当前正确工作流：**
 
 ```bash
 pnpm install
-pnpm -r build      # 必须先 build（生成 shared/dist/，engine 的 project reference 依赖它）
-pnpm -r typecheck  # 否则 typecheck/test 会失败
-pnpm -r test
+pnpm -r build      # typecheck 前必须先 build（engine 的 tsconfig project reference 依赖 shared/dist）
+pnpm -r typecheck
+pnpm -r test       # 测试本身无需 build——各包 vitest.config.ts 已配 resolve.alias 直走源码
 ```
 
-> 全新 clone 后**不能**直接 `pnpm -r test`——engine 的 tsconfig 用 project reference 指向 shared，依赖 shared 的 `dist/`（已 gitignore）。Phase 2 计划用 vite 别名让 vitest 直走 shared 源码以消除此前置依赖。详见 overview §8。
+> **test 已无需 build 前置**：shared/engine/server 三包的 `vitest.config.ts` 均配了 `resolve.alias`（`@1api/shared` → 源码、`@1api/engine` → 源码），全新 clone 后 `pnpm install && pnpm -r test` 直接可用。
+> **typecheck 仍需先 build**：engine 的 `tsconfig.json` 用 project reference（`references` + `composite`）指向 shared，tsc 依赖 shared 的 `dist/`（已 gitignore）。故 `pnpm -r typecheck` 前须 `pnpm -r build`。详见 overview §8。
 
 **常规命令：**
 
@@ -80,6 +84,19 @@ pnpm --filter @1api/engine test src/__tests__/dynamic-sql.test.ts   # 单文件
 - `AppError` 类 + `Errors` 工厂定义在 **`@1api/shared`**（`packages/shared/src/errors.ts`），engine 与 server 共用，**不要**在 engine/server 各自定义错误。
 - 错误码集中在 `@1api/shared` 的 `ErrorCode` 常量（前缀分类：`TABLE_*` / `VALIDATION_*` / `DB_*` / `AUTH_*` 等）。
 - 抛错用工厂方法：`throw Errors.tableNotFound(name)`，不要 `new AppError(...)` 手写。
+
+### 错误信封（server，`api/instance.ts` enveloper + `app.ts` 兜底中间件）
+
+- **未知错误脱敏**：响应信封对 `AppError`/`erest.ERestError`（已知业务/校验错误）透传真实 message；对其它未知错误（TypeError / better-sqlite3 报错等含文件路径/SQL 片段/变量名）**固定返回「服务器内部错误」**，真实 stack 仅 `log.error` 记录，**不外泄内部结构**（OWASP 信息泄露）。
+- **Zod 校验码归一**：erest 抛的 `ERestError`（code ∈ `MISSING_PARAM`/`INVALID_PARAM`/`VALIDATION_ERROR`）在信封里统一归一化为项目业务码 `VALIDATION_FAIL`（`api/instance.ts` 的 `normalizeErrorCode`），前端按此匹配，不依赖 erest 内部码。
+- 判断已知/未知用 `instanceof`：`err instanceof AppError || err instanceof ERestError`（`AppError` from `@1api/shared`，`ERestError` from `erest`）。
+
+### admin 通道鉴权（server，关键决策）
+
+- **admin 通道用 @leizm/web 原生 session（cookie），不用 Bearer token**。`requireAdmin`（`hooks.ts`）读 `ctx.reply.raw.session.data['adminId']`；login（`routes/auth.ts`）经 `session.regenerate()`（防 session 固定）写入 adminId；logout 销毁 session + `clearCookie`，凭证立即失效。
+- cookie：`admin.sid`，`httpOnly` + `sameSite:'lax'`，进程内存存储（`SessionMemoryStore`，重启失效）。
+- **对外 `/api/data/*` 通道才是 Bearer token**（`requireToken` 解析 `Authorization: Bearer oa_xxx`，sha256 比对）。admin 与 data 两套鉴权**解耦**——不要在 admin 通道复用 token 体系（早期实现曾误用 admin token，已纠正回 session）。
+- **测试夹具必须用 @erest/leizmweb**（`helpers.ts` 用 leizm/web app + 同款 session 中间件 + `api.initTest(app.server)` 走真实 HTTP + cookie jar），**不要**用 supertest/express——否则 session/cookie 行为测不到（曾因此漏掉 leizm/web 的 reply.send 404 bug）。
 
 ### 动态 SQL 安全（`@1api/engine` 核心）
 
@@ -155,9 +172,19 @@ Phase 5（SDK+CLI，依赖 Phase 1+2）
 
 | 坑 | 现象 | 对策 |
 |---|---|---|
-| **build 前置依赖** | 全新 clone 后 `pnpm -r test`/`typecheck` 失败，engine 报 `Cannot find module '@1api/shared'` | 先 `pnpm -r build`。Phase 2 待用 vite 别名根治。 |
+| **build 前置依赖** | 全新 clone 后 `pnpm -r typecheck` 失败，engine 报 `Cannot find module '@1api/shared'` | `pnpm -r typecheck` 前先 `pnpm -r build`（engine 的 tsconfig project reference 依赖 shared/dist）。**test 已无需 build**——Phase 2 已配 vitest `resolve.alias` 直走源码（见 §3）。 |
 | **`exactOptionalPropertyTypes`** | `enumValues: input.enumValues`、`note: opts.note` 等可选属性赋 `undefined` 时 typecheck 报 TS2375/2379 | 条件挂载：`if (x !== undefined) obj.opt = x`，见 schema-ddl.ts / metadata.ts / schema-service.ts。 |
 | **Node v26 + better-sqlite3** | spec 原定 `better-sqlite3@^11` 在 Node 26 下 node-gyp 编译失败 | 升至 `^12`（v12.11+ 有 Node26 预编译）。Phase 2 依赖块沿用 `^12`。 |
 | **`pnpm exec tsx` 未装** | 想用 tsx 跑临时脚本，报 `tsx not found` | tsx 是 Phase 2 dev 依赖，Phase 1 不装。临时脚本改用 vitest 集成测试跑（vite 转译 TS）。 |
 | **`.worktrees/` 必须先 gitignore** | 否则 worktree 内容污染 git status | `.gitignore` 首行留 `.worktrees/`，创建 worktree 前确认已忽略。 |
 | **`toThrow(AppError)` 实例匹配** | `expect(...).rejects.toThrow(Errors.validationFail(''))` 因 message 不同而失败（实际 message 含字段名） | 用正则匹配关键内容：`.rejects.toThrow(/非数值类型/)`，不要匹配整个 error 实例。 |
+
+## 附录：Phase 2 踩坑教训（勿重蹈）
+
+| 坑 | 现象 | 对策 |
+|---|---|---|
+| **erest 的 zod 是 peerDependency** | erest 3.2+ 把 `zod ^4` 列为 peerDep；server 若不直接依赖 zod，pnpm 严格模式解析不到；且 `import { z } from 'erest'` 再导出 schema 类型会触发 TS2742（穿透 erest 符号链接解析 zod） | server **直接依赖** `zod`；定义可导出 schema 的文件（`routes/schemas.ts`）用 `import { z } from 'zod'`（非 `'erest'`）。 |
+| **enveloper 与非 JSON 响应冲突** | registerTyped handler 用 raw 手动写 CSV/下载后，handler return 触发 enveloper 再包一层 `reply.json()`，靠「response 已 end 后 json 写不动」兜底是脆弱巧合（三框架行为不一） | 手动写完 raw 响应后调 `ctx.reply.markSent()`（erest 3.2.1+），enveloper 显式跳过。见 `routes/admin-data.ts` CSV 导出。 |
+| **@leizm/web response 无 `send()`** | `ctx.reply.send(text)` 在 leizm/web adapter 下曾映射到不存在的 `response.send()`（可选链静默失败→404） | erest 3.2.1 已修复（send→`response.end`）；自己用 raw 时也用 `response.end(data)`，勿假设有 send。 |
+| **DELETE 参数走 query 非 body** | erest 测试引擎 `.input()` 对 GET/DELETE 归 query（HTTP DELETE body 不通用）；schema 从 body 读会 MISSING_PARAM | DELETE 路由 schema 用 `query`，确认参数经 `coerceBool`（禁 `z.coerce.boolean()`，见 §4）。 |
+| **测试夹具必须与生产同框架** | 曾用 express 测试夹具 + 生产 leizm/web，导致 session/cookie/send 等 leizm/web 专属行为测不到（漏掉 reply.send 404） | 测试夹具用 @erest/leizmweb + leizm/web app + 同款中间件（见 §4 admin 鉴权）。 |

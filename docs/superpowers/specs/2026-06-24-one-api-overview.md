@@ -320,7 +320,7 @@ const Errors = {
 | 语言 | TypeScript | strict 模式 |
 | Lint / Format | oxlint + oxfmt | 全 workspace 统一 |
 | 后端框架 | @leizm/web | node-erest 的 leizmweb adapter |
-| API 定义 | node-erest (v2) | Zod 4 参数校验 + 自动文档 + 测试脚手架 |
+| API 定义 | node-erest (v3，@erest/leizmweb adapter + createERest) | Zod 4 参数校验 + 自动文档 + 测试脚手架 + enveloper 模式 |
 | SQL 构造 | kysely 0.29 | 官方 SqliteDialect（底层 better-sqlite3） |
 | 数据库 | better-sqlite3 | 同步 API，性能最佳 |
 | MCP | @modelcontextprotocol/sdk | Streamable HTTP transport |

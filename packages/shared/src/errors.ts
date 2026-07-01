@@ -31,4 +31,9 @@ export const Errors = {
   validationFail: (msg: string) => new AppError(ErrorCode.VALIDATION_FAIL, 400, msg),
   dbError: () => new AppError(ErrorCode.DB_ERROR, 500, '数据库错误'),
   internalError: (msg: string) => new AppError(ErrorCode.INTERNAL_ERROR, 500, msg),
+  // —— Phase 2：鉴权层 ——
+  unauthorized: () => new AppError(ErrorCode.UNAUTHORIZED, 401, '未登录或登录已失效'),
+  invalidToken: () => new AppError(ErrorCode.INVALID_TOKEN, 401, '无效或已过期的 Token'),
+  forbidden: () => new AppError(ErrorCode.FORBIDDEN, 403, '无权执行此操作'),
+  authInvalidCredentials: () => new AppError(ErrorCode.UNAUTHORIZED, 401, '用户名或密码错误'),
 };
