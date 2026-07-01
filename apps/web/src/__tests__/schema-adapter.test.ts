@@ -68,6 +68,24 @@ describe('fieldsToEditorSchema', () => {
     const s = fieldsToEditorSchema([f({ name: 'a', jsonType: 'string', label: '标题' })]);
     expect(s.properties['a']!.title).toBe('标题');
   });
+
+  it('excludeSystem:true → 系统管理字段不出现', () => {
+    const s = fieldsToEditorSchema(
+      [
+        f({ name: 'id', jsonType: 'integer', isPrimary: true, isAutoIncrement: true }),
+        f({ name: 'title', jsonType: 'string' }),
+        f({ name: 'created_at', jsonType: 'datetime' }),
+        f({ name: 'updated_at', jsonType: 'datetime' }),
+      ],
+      { excludeSystem: true },
+    );
+    expect(s.properties).not.toHaveProperty('id');
+    expect(s.properties).not.toHaveProperty('created_at');
+    expect(s.properties).not.toHaveProperty('updated_at');
+    expect(s.properties).toHaveProperty('title');
+    expect(s.required).not.toContain('id');
+    expect(s.required).toContain('title');
+  });
 });
 
 describe('isSystemManaged', () => {

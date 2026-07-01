@@ -34,7 +34,12 @@ const formModel = ref<Record<string, unknown>>({});
 const visibleFields = computed(() => (meta.value?.fields ?? []).filter((f) => !f.isHidden));
 const canEdit = computed(() => meta.value?.isEditable ?? false);
 
-const editorSchema = computed(() =>
+// 新增模式：排除系统管理字段（自增主键/created_at/updated_at），避免 validate 失败
+const createSchema = computed(() =>
+  meta.value ? fieldsToEditorSchema(meta.value.fields, { excludeSystem: true }) : { type: 'object' as const, properties: {}, required: [] },
+);
+// 编辑模式：系统字段 readOnly 展示
+const editSchema = computed(() =>
   meta.value ? fieldsToEditorSchema(meta.value.fields) : { type: 'object' as const, properties: {}, required: [] },
 );
 
@@ -173,7 +178,7 @@ watch([page, size], load);
 
     <!-- vue-json-ui-editor 用途①：数据编辑表单 -->
     <el-dialog v-model="dlgVisible" :title="dlgMode === 'create' ? '新增记录' : '编辑记录'" width="560px">
-      <JsonEditor ref="editorRef" :schema="editorSchema" v-model="formModel" />
+      <JsonEditor ref="editorRef" :schema="dlgMode === 'create' ? createSchema : editSchema" v-model="formModel" />
       <template #footer>
         <el-button @click="dlgVisible = false">取消</el-button>
         <el-button type="primary" @click="onSubmit">保存</el-button>

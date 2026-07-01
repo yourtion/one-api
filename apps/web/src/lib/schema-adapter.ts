@@ -36,12 +36,15 @@ interface EditorSchema {
  *  - isReadonly / 系统管理字段 → readOnly:true
  *  - nullable=false → required
  */
-export function fieldsToEditorSchema(fields: FieldMeta[]): EditorSchema {
+export function fieldsToEditorSchema(fields: FieldMeta[], opts?: { excludeSystem?: boolean }): EditorSchema {
   const properties: Record<string, Record<string, unknown>> = {};
   const required: string[] = [];
 
   for (const field of fields) {
     if (field.isHidden) continue;
+    // 新增模式：完全跳过系统管理字段（自增主键/created_at/updated_at），
+    // 这些字段由系统维护，用户不应填写，出现在 required 里会导致 validate 失败。
+    if (opts?.excludeSystem && isSystemManaged(field)) continue;
 
     const prop: Record<string, unknown> = { title: field.label || field.name };
     let attrs: Record<string, unknown> | undefined;
@@ -71,7 +74,7 @@ export function fieldsToEditorSchema(fields: FieldMeta[]): EditorSchema {
       required.push(field.name);
     }
 
-    // 只读
+    // 只读（编辑模式下系统字段仍展示但禁用）
     if (field.isReadonly || isSystemManaged(field)) {
       prop['readOnly'] = true;
     }
