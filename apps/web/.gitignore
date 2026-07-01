@@ -1,0 +1,6 @@
+dist/
+node_modules/
+*.tsbuildinfo
+# 由 unplugin-auto-import / unplugin-vue-components 生成，dev/build 时自动重建
+auto-imports.d.ts
+components.d.ts
