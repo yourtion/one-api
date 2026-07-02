@@ -6,6 +6,8 @@ import { resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
 import { log } from './utils/logger.js';
+import { getSystemDb } from './core/system-db.js';
+import { createMcpMiddleware } from './modules/mcp/transport.js';
 
 // 当前模块目录（dist 下，静态根默认相对此处的 static/admin）
 const here = fileURLToPath(new URL('.', import.meta.url));
@@ -33,6 +35,10 @@ export function buildApp(): web.Application {
   const app = new web.Application();
 
   // 1. 全局前置中间件
+  // /mcp 必须在 bodyParser 之前注册：handler 直接拿原始 Node 流交给 MCP transport，
+  // 不调 ctx.next() 短路 → bodyParser 永远不会读到 /mcp 请求体（transport 需自读流）。
+  // 非 /mcp 路径由框架按前缀自动跳过本中间件。
+  app.use('/mcp', createMcpMiddleware(getSystemDb()));
   app.use('/', web.component.bodyParser.json());
   app.use('/', web.component.bodyParser.urlencoded({ extended: true }));
   // cookieParser + session（admin 通道会话载体；顺序敏感，须在读取 session 的路由前装配）

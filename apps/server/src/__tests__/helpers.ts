@@ -16,6 +16,7 @@ import { initSystemDb, type SystemDbHandle } from '../db/system.js';
 import { initEngine, _resetEngine } from '../core/engine.js';
 import { setSystemDb } from '../core/system-db.js';
 import { applySessionMiddleware } from '../middlewares/session.js';
+import { createMcpMiddleware } from '../modules/mcp/transport.js';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -84,6 +85,8 @@ export async function setupTest(): Promise<TestSetup> {
   // 注意：erest group prefix 是 /auth /admin /data（无 /api），测试请求也用无 /api 路径，
   // 故 erest 直接 bind 到根 router（与生产 /api 子 router 区别仅在挂载点，路由逻辑同构）。
   const app = new web.Application();
+  // /mcp 必须在 bodyParser 之前（与生产 app.ts 同构）
+  app.use('/mcp', createMcpMiddleware(systemDb.db));
   app.use('/', web.component.bodyParser.json());
   app.use('/', web.component.bodyParser.urlencoded({ extended: true }));
   applySessionMiddleware(app);
@@ -109,8 +112,19 @@ export async function setupTest(): Promise<TestSetup> {
   // initTest 接受 leizm/web 的 app.server（http.Server），归一化为随机端口
   api.initTest(app.server);
 
+  // erest 的 initTest 是**延迟 listen**：只有首次 erest 测试请求时才调 server.listen(0)。
+  // erest 自身的 test.session() 在 fetch 前 await ready() 门控，所以 erest 测试不受影响；
+  // 但 MCP Client SDK 用我们拼的 mcpUrl 直连 fetch，绕过 erest 门控——若此时 server 尚未
+  // listen，connect 会 EADDRNOTAVAIL（port 0）。故在此显式 listen(0) 并 await 'listening'，
+  // 拿到真实端口。erest 后续首次请求时 normalizeTestTarget 检测到 address() 已非 null，
+  // 直接复用此 server，不会重复 listen。
+  await new Promise<void>((resolve) => {
+    if (app.server.listening) return resolve();
+    app.server.listen(0, () => resolve());
+    app.server.unref?.();
+  });
+
   // MCP 端点需要完整 URL（MCP Client SDK 用 URL 连接，不能只用 path）。
-  // app.server 已被 initTest 触发 listen(随机端口)，从 address() 取实际端口。
   const addr = app.server.address();
   const port = typeof addr === 'object' && addr ? addr.port : 0;
   const mcpUrl = `http://127.0.0.1:${port}/mcp`;
