@@ -10,3 +10,4 @@ export { readTableSchema, listTables } from './schema-reader.js';
 export { createTable, addColumn, inputToField } from './schema-ddl.js';
 export type { SystemDB, TableMetaRow } from './system-db.js';
 export { SYSTEM_DB_MIGRATIONS } from './system-db.js';
+export { ensureDbDir } from './fs-utils.js';

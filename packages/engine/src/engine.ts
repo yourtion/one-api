@@ -5,6 +5,7 @@ import { DynamicSql } from './dynamic-sql.js';
 import { MetadataStore } from './metadata.js';
 import { SchemaService } from './schema-service.js';
 import { SYSTEM_DB_MIGRATIONS, type SystemDB } from './system-db.js';
+import { ensureDbDir } from './fs-utils.js';
 
 export interface CreateEngineOptions {
   businessDbPath: string;
@@ -35,6 +36,8 @@ export class DataEngine {
 export async function createEngine(
   opts: CreateEngineOptions,
 ): Promise<DataEngine & { destroy(): Promise<void> }> {
+  ensureDbDir(opts.businessDbPath);
+  ensureDbDir(opts.systemDbPath);
   const businessRaw = new Database(opts.businessDbPath);
   businessRaw.pragma('journal_mode = WAL');
   const systemRaw = new Database(opts.systemDbPath);
