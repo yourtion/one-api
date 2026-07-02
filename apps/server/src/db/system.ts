@@ -1,5 +1,6 @@
 import { Kysely, SqliteDialect } from 'kysely';
 import Database from 'better-sqlite3';
+import { ensureDbDir } from '@1api/engine';
 import { hashPassword } from '../utils/password.js';
 import type { ServerSystemDB } from './types.js';
 import { SYSTEM_DDL } from './migrations.js';
@@ -20,6 +21,7 @@ export async function initSystemDb(
   path: string,
   defaultAdmin: { name: string; password: string } = { name: 'admin', password: '123456' },
 ): Promise<SystemDbHandle> {
+  ensureDbDir(path);
   const raw = new Database(path);
   for (const sql of SYSTEM_DDL) raw.exec(sql);
 

@@ -2,7 +2,13 @@ import * as web from '@leizm/web';
 import { LeizmWebAdapter } from '@erest/leizmweb';
 import { ERestError } from 'erest';
 import { AppError } from '@1api/shared';
+import { resolve as resolvePath } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { existsSync } from 'node:fs';
 import { log } from './utils/logger.js';
+
+// 当前模块目录（dist 下，静态根默认相对此处的 static/admin）
+const here = fileURLToPath(new URL('.', import.meta.url));
 import { applySessionMiddleware } from './middlewares/session.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerTableRoutes } from './routes/table.js';
@@ -56,6 +62,23 @@ export function buildApp(): web.Application {
   const apiRouter = new web.Router();
   api.bind({ adapter: new LeizmWebAdapter(), app: apiRouter, router: web.Router });
   app.use('/api', apiRouter);
+
+  // 3.5 Phase 3：/admin 静态托管 + SPA history fallback
+  // 静态根：优先环境变量（测试注入），默认 dist 上一级 static/admin
+  // （here 指向 apps/server/dist/，web 产物输出到 apps/server/static/admin）
+  const ADMIN_ROOT = process.env['ONE_API_ADMIN_ROOT'] ?? resolvePath(here, '../static/admin');
+  if (existsSync(ADMIN_ROOT)) {
+    // (a) 真实静态资源（assets 等）；index:false → index.html 由 fallback 统一发
+    app.use('/admin', web.component.serveStatic(ADMIN_ROOT, { index: false, fallthrough: true }));
+    // (b) SPA history fallback：use 前缀匹配 /admin、/admin/、/admin/** 任意路径；
+    //     未命中真实文件的请求统一回 index.html。
+    //     ⚠️ 不能用裸 '*'（path-to-regexp v6 抛 Unexpected MODIFIER）；
+    //     不能用 router.get('/admin/:splat*')（不匹配 /admin/ 空 splat）。
+    const indexFile = resolvePath(ADMIN_ROOT, 'index.html');
+    app.use('/admin', (ctx) => {
+      ctx.response.file(indexFile);
+    });
+  }
 
   // 4. app 级错误中间件（双参数）：统一信封
   app.use('/', (ctx, err) => {
