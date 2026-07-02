@@ -56,6 +56,7 @@ export function createMcpMiddleware(systemDb: Kysely<ServerSystemDB>) {
       // 3. 交给 transport 处理原始 Node 流（两参形式：transport 自读 req 流）
       await transport.handleRequest(ctx.request.req, ctx.response.res);
       // transport.handleRequest 内部已 end 响应；不调 ctx.next() 短路
+      /* c8 ignore next 13 - 防御性兜底：tool 错误已被 SDK 转 isError，此 catch 仅在 transport/connect 自身异常时触发，无干净触发路径 */
     } catch (err) {
       log.error('MCP 处理失败: %s', (err as Error).stack ?? (err as Error).message);
       if (!ctx.response.res.headersSent) {
