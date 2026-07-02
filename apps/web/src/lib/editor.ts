@@ -1,15 +1,25 @@
 import JsonEditor from 'vue-json-ui-editor';
-import { ElOption } from 'element-plus';
+import type { OptionContext } from 'vue-json-ui-editor';
+import { ElOption, ElButton, ElIcon } from 'element-plus';
+import { Plus, Delete } from '@element-plus/icons-vue';
+import { h } from 'vue';
 
-/** setComponent 的类型（库内用 as any 挂载，这里补类型签名） */
-type SetComponent = (
-  type: string,
-  component: string | object,
-  option?:
-    | Record<string, unknown>
-    | ((ctx: { vm: unknown; field: unknown; item: unknown }) => Record<string, unknown>),
-) => void;
-const setComponent = (JsonEditor as unknown as { setComponent: SetComponent }).setComponent.bind(JsonEditor);
+// vue-json-ui-editor v3.1+ 已导出正式类型，setComponent 无需 as any
+const setComponent = JsonEditor.setComponent;
+
+// object 数组增删行按钮：圆形图标（+ 添加 / 回收站删除）
+const AddIconButton = {
+  render() {
+    return h(ElButton, { circle: true, size: 'small', type: 'primary' }, () => h(ElIcon, () => h(Plus)));
+  },
+};
+const RemoveIconButton = {
+  render() {
+    return h(ElButton, { circle: true, size: 'small', type: 'danger', plain: true }, () =>
+      h(ElIcon, () => h(Delete)),
+    );
+  },
+};
 
 let registered = false;
 
@@ -21,13 +31,9 @@ export function setupEditor(): void {
   if (registered) return;
   registered = true;
 
-  setComponent('form', 'el-form', ({ vm }) => ({ labelWidth: '110px', model: (vm as { model: unknown }).model }));
-  setComponent('label', 'el-form-item', ({ field }) => ({ prop: (field as { name: string }).name }));
-  setComponent('error', 'el-alert', ({ vm }) => ({
-    type: 'error',
-    title: (vm as { error: string }).error,
-    closable: false,
-  }));
+  setComponent('form', 'el-form', ({ vm }: OptionContext) => ({ labelWidth: '110px', model: vm.model }));
+  setComponent('label', 'el-form-item', ({ field }: OptionContext) => ({ prop: field.name, label: field.label }));
+  setComponent('error', 'el-alert', ({ vm }: OptionContext) => ({ type: 'error', title: vm.error, closable: false }));
 
   setComponent('text', 'el-input');
   setComponent('textarea', 'el-input');
@@ -36,6 +42,9 @@ export function setupEditor(): void {
   setComponent('option', ElOption);
   setComponent('switch', 'el-switch');
   setComponent('date', 'el-date-picker'); // datetime 自定义类型
+  // object 数组增删行按钮 → 圆形图标
+  setComponent('arrayadd', AddIconButton);
+  setComponent('arrayremove', RemoveIconButton);
 }
 
 export { JsonEditor };
