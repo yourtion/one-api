@@ -91,8 +91,8 @@ importers:
         specifier: ^3.5.0
         version: 3.5.39(typescript@5.9.3)
       vue-json-ui-editor:
-        specifier: link:/Users/yourtionguo/codes/open/vue-json-ui-editor
-        version: link:../../../../../vue-json-ui-editor
+        specifier: ^3.1.0
+        version: 3.1.0(vue@3.5.39(typescript@5.9.3))
       vue-router:
         specifier: ^4.4.0
         version: 4.6.4(vue@3.5.39(typescript@5.9.3))
@@ -2525,6 +2525,11 @@ packages:
       '@vue/composition-api':
         optional: true
 
+  vue-json-ui-editor@3.1.0:
+    resolution: {integrity: sha512-2UqRUC0UUQIZDljOOY3+0UH85ZcALKXvPv0wzsyA7LX5z7e/+Ko8Lbn5m+sAUOMw3nKGwEyNfLKeSxO5j+zNpQ==}
+    peerDependencies:
+      vue: ^3
+
   vue-router@4.6.4:
     resolution: {integrity: sha512-Hz9q5sa33Yhduglwz6g9skT8OBPii+4bFn88w6J+J4MfEo4KRRpmiNG/hHHkdbRFlLBOqxN8y8gf2Fb0MTUgVg==}
     peerDependencies:
@@ -4947,6 +4952,11 @@ snapshots:
 
   vue-demi@0.14.10(vue@3.5.39(typescript@5.9.3)):
     dependencies:
+      vue: 3.5.39(typescript@5.9.3)
+
+  vue-json-ui-editor@3.1.0(vue@3.5.39(typescript@5.9.3)):
+    dependencies:
+      '@element-plus/icons-vue': 2.3.2(vue@3.5.39(typescript@5.9.3))
       vue: 3.5.39(typescript@5.9.3)
 
   vue-router@4.6.4(vue@3.5.39(typescript@5.9.3)):

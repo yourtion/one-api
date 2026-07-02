@@ -9,10 +9,18 @@ const router = useRouter();
 const stats = ref({ tables: 0, tokens: 0, admins: 0 });
 const recent = ref<TableMeta[]>([]);
 const loading = ref(true);
+const errorMsg = ref('');
 
 onMounted(async () => {
+  // 三个统计各自独立捕获：任一接口失败不拖累其余（例如 tokens 接口异常不影响表列表展示）
+  const tablesP = listTables().catch((e) => {
+    errorMsg.value = (e as Error).message;
+    return [] as TableMeta[];
+  });
+  const tokensP = listTokens().catch(() => []);
+  const adminsP = listAdmins().catch(() => []);
   try {
-    const [tables, tokens, admins] = await Promise.all([listTables(), listTokens(), listAdmins()]);
+    const [tables, tokens, admins] = await Promise.all([tablesP, tokensP, adminsP]);
     stats.value = { tables: tables.length, tokens: tokens.length, admins: admins.length };
     recent.value = [...tables].sort((a, b) => b.createdAt - a.createdAt).slice(0, 5);
   } finally {
@@ -24,6 +32,7 @@ onMounted(async () => {
 <template>
   <div class="page" v-loading="loading">
     <div class="page-header"><h1 class="page-title">概览</h1></div>
+    <el-alert v-if="errorMsg" type="error" :title="errorMsg" :closable="false" style="margin-bottom: 16px" />
     <div class="stats-grid">
       <StatCard label="已注册表" :value="stats.tables" />
       <StatCard label="Token 数" :value="stats.tokens" />

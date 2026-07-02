@@ -16,6 +16,7 @@ describe('request 信封解包', () => {
 
   it('业务错误信封 → 抛 ApiRequestError', async () => {
     const ax = mockAxios(() => ({ data: { success: false, error: { code: 'TABLE_NOT_FOUND', message: '表 x 不存在' } } }));
+    await expect(request(ax, 'get', '/x')).rejects.toThrow(ApiRequestError);
     await expect(request(ax, 'get', '/x')).rejects.toMatchObject({ code: 'TABLE_NOT_FOUND', message: '表 x 不存在' });
   });
 

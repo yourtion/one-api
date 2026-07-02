@@ -25,6 +25,12 @@ body {
 /* 数据/标识符统一用等宽 */
 .mono, .el-table td.code, .el-table th.code { font-family: var(--font-mono); }
 
+/* 隐藏 vue-json-ui-editor 默认渲染的 Submit 按钮（各页面用自定义按钮提交）。
+   该按钮特征：<button type="submit" label="Submit">，无 class；业务提交按钮均为 el-button，不会误伤。 */
+button[type="submit"][label="Submit"] {
+  display: none;
+}
+
 /* 页面卡片容器 */
 .page { padding: 24px; }
 .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
