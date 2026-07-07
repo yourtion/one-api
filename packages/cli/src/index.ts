@@ -17,6 +17,7 @@ const program = new Command();
 program
   .name('one-api-cli')
   .description('one-api 终端工具（远程模式走 HTTP，本地模式直连 SQLite）')
+  .version('0.0.0')
   .option('-H, --host <url>', '远程 server 地址（覆盖配置文件）')
   .option('-T, --token <token>', '远程 token')
   .option('-D, --db <path>', '本地业务库路径')
