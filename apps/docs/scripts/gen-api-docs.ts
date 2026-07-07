@@ -18,7 +18,7 @@
  *
  * 产出随构建手动刷新，保证与实际路由不漂移。
  */
-import { mkdirSync, readdirSync, mkdtempSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -84,22 +84,7 @@ async function main() {
     if (files.length === 0) {
       throw new Error('API 文档生成失败：api-reference 目录无 markdown 产出');
     }
-
-    // 后处理：去掉每个 API 标题的 ❌ 标记。
-    // erest 的 ❌/✅ 表示路由是否经 test-agent 跑过（.tested），与 API 是否可用无关。
-    // 本项目有完整 vitest 套件（90/90）覆盖路由，tested 标记对最终文档读者无信息价值，
-    // 留着 ❌ 反而让读者误以为「测试未通过」。示例已由 .example() 提供。
-    let stripped = 0;
-    for (const f of files) {
-      const fp = join(outDir, f);
-      const before = readFileSync(fp, 'utf8');
-      const after = before.replace(/ ❌/g, '');
-      if (before !== after) {
-        writeFileSync(fp, after);
-        stripped += 1;
-      }
-    }
-    console.log(`✓ API 文档已生成，共 ${files.length} 个文件（${stripped} 个去除 ❌ 标记）：`, files.join(', '));
+    console.log(`✓ API 文档已生成，共 ${files.length} 个文件：`, files.join(', '));
   } finally {
     // 清理临时 systemDb（不残留临时文件）
     await systemDbHandle.close();
