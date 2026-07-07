@@ -32,7 +32,11 @@ export function registerAuthRoutes(api: AppApi): void {
   const store = createAdminStore(getSystemDb());
   const auth = api.group('auth');
 
-  auth.post('/login').title('登录').registerTyped(
+  auth.post('/login').title('登录').example({
+    name: '正常登录',
+    input: { name: 'admin', password: '123456' },
+    output: { admin: { id: 1, name: 'admin', nickname: '管理员', mustChangePassword: false }, mustChangePassword: false },
+  }).registerTyped(
     { body: z.object({ name: z.string(), password: z.string() }) },
     async (req, ctx) => {
       const { name, password } = req.body;
@@ -49,7 +53,11 @@ export function registerAuthRoutes(api: AppApi): void {
     },
   );
 
-  auth.get('/me').title('当前管理员').before(requireAdmin(getSystemDb())).registerTyped({}, async (_req, ctx) => {
+  auth.get('/me').title('当前管理员').example({
+    name: '当前管理员信息',
+    input: {},
+    output: { id: 1, name: 'admin', nickname: '管理员', mustChangePassword: false },
+  }).before(requireAdmin(getSystemDb())).registerTyped({}, async (_req, ctx) => {
     const user = ctx.state.currentUser;
     if (!user) throw Errors.unauthorized();
     const admin = await store.findById(user.id);
@@ -57,7 +65,11 @@ export function registerAuthRoutes(api: AppApi): void {
     return toAdminVO(admin);
   });
 
-  auth.put('/password').title('修改密码').before(requireAdmin(getSystemDb())).registerTyped(
+  auth.put('/password').title('修改密码').example({
+    name: '修改密码成功',
+    input: { oldPassword: '123456', newPassword: 'newpass789' },
+    output: { success: true },
+  }).before(requireAdmin(getSystemDb())).registerTyped(
     { body: z.object({ oldPassword: z.string(), newPassword: z.string().min(6) }) },
     async (req, ctx) => {
       const user = ctx.state.currentUser;
@@ -70,7 +82,11 @@ export function registerAuthRoutes(api: AppApi): void {
     },
   );
 
-  auth.post('/logout').title('登出').before(requireAdmin(getSystemDb())).registerTyped({}, async (_req, ctx) => {
+  auth.post('/logout').title('登出').example({
+    name: '登出成功',
+    input: {},
+    output: { success: true },
+  }).before(requireAdmin(getSystemDb())).registerTyped({}, async (_req, ctx) => {
     // 销毁 session 存储 + 清除客户端 cookie，凭证立即失效
     await ctx.reply.raw.session.destroy();
     ctx.reply.raw.response.clearCookie(SESSION_NAME);

@@ -13,11 +13,19 @@ export function registerTokenRoutes(api: ERest<Middleware>): void {
   const admin = api.group('admin').before(requireAdmin(getSystemDb()));
   const store = createTokenStore(getSystemDb());
 
-  admin.get('/tokens').title('Token 列表').registerTyped({}, async () => {
+  admin.get('/tokens').title('Token 列表').example({
+    name: '获取全部 Token',
+    input: {},
+    output: { rows: [{ id: 1, name: '前端读', token_prefix: 'oa_a3f9', permissions: { tables: ['users'], actions: ['read'] }, is_active: true, expires_at: null, last_used_at: null, created_at: 1700000000, updated_at: 1700000000 }] },
+  }).registerTyped({}, async () => {
     const rows = await store.list();
     return rows.map(tokenToListVO);  });
 
-  admin.post('/tokens').title('创建 Token').registerTyped(
+  admin.post('/tokens').title('创建 Token').example({
+    name: '创建可读 users 表的 Token',
+    input: { name: '前端读', permissions: { tables: ['users'], actions: ['read'] } },
+    output: { id: 1, name: '前端读', token: 'oa_a3f9c2e8b1d7e6f5a4b3c2d1', tokenPrefix: 'oa_a3f9', permissions: { tables: ['users'], actions: ['read'] } },
+  }).registerTyped(
     {
       body: z.object({
         name: z.string(),
@@ -35,7 +43,12 @@ export function registerTokenRoutes(api: ERest<Middleware>): void {
     return tokenToCreateVO(row, plain);    },
   );
 
-  admin.put('/tokens/:id').title('更新 Token').registerTyped(
+  admin.put('/tokens/:id').title('更新 Token').example({
+    name: '停用 Token',
+    path: '/tokens/1',
+    input: { isActive: false },
+    output: { success: true },
+  }).registerTyped(
     {
       params: IdParam,
       body: z.object({
@@ -61,7 +74,12 @@ export function registerTokenRoutes(api: ERest<Middleware>): void {
     return { success: true };    },
   );
 
-  admin.delete('/tokens/:id').title('删除 Token').registerTyped(
+  admin.delete('/tokens/:id').title('删除 Token').example({
+    name: '删除 Token',
+    path: '/tokens/1',
+    input: {},
+    output: { success: true },
+  }).registerTyped(
     { params: IdParam },
     async (req) => {
       await store.delete(req.params.id);
