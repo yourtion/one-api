@@ -4,7 +4,6 @@ import type {
   ListResult,
   CreateModelOptions,
   FieldMetaInput,
-  FilterOperator,
 } from '@1api/shared';
 import { OneApiError } from './error.js';
 
@@ -60,7 +59,7 @@ export function createClient(baseUrl: string, token: string, opts?: CreateClient
         headers: {
           authorization: `Bearer ${token}`,
           'content-type': 'application/json',
-          ...(init.headers ?? {}),
+          ...init.headers,
         },
       });
     } catch {

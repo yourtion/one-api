@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClient } from '../client.js';
-import { OneApiError } from '../error.js';
 
 /** 构造一个 mock fetch，按预期返回信封 JSON。返回 spy 便于断言调用参数。 */
 function mockFetch(response: { status?: number; body: unknown }, init?: { headers?: Record<string,string> }): {
@@ -10,7 +9,7 @@ function mockFetch(response: { status?: number; body: unknown }, init?: { header
   const spy = vi.fn(async () =>
     new Response(JSON.stringify(response.body), {
       status: response.status ?? 200,
-      headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
+      headers: { 'content-type': 'application/json', ...init?.headers },
     }),
   );
   return { fetch: spy as unknown as typeof fetch, spy };
