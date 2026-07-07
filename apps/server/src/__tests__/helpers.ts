@@ -16,6 +16,7 @@ import { initSystemDb, type SystemDbHandle } from '../db/system.js';
 import { initEngine, _resetEngine } from '../core/engine.js';
 import { setSystemDb } from '../core/system-db.js';
 import { applySessionMiddleware } from '../middlewares/session.js';
+import { createMcpMiddleware } from '../modules/mcp/transport.js';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -28,6 +29,8 @@ export interface TestSetup {
   api: ERest<Middleware>;
   systemDb: SystemDbHandle['db'];
   businessDbPath: string;
+  /** MCP 端点全路径（如 http://127.0.0.1:<port>/mcp），供 MCP Client SDK 连接 */
+  mcpUrl: string;
   /** 走 erest initTest 的测试客户端（无鉴权态，独立 cookie jar） */
   session: () => TestSession;
   /** admin/123456 登录，返回已建立会话的 TestSession（cookie 已落 jar，后续请求自动带） */
@@ -37,6 +40,11 @@ export interface TestSetup {
     perms: { tables: string[]; actions: string[] },
     opts?: { isActive?: boolean; expiresAt?: number | null },
   ) => Promise<string>;
+  /** 同 insertToken，但同时返回 token id（便于失效/吊销测试） */
+  insertTokenWithId: (
+    perms: { tables: string[]; actions: string[] },
+    opts?: { isActive?: boolean; expiresAt?: number | null },
+  ) => Promise<{ plain: string; id: number }>;
   cleanup: () => Promise<void>;
 }
 
@@ -77,6 +85,8 @@ export async function setupTest(): Promise<TestSetup> {
   // 注意：erest group prefix 是 /auth /admin /data（无 /api），测试请求也用无 /api 路径，
   // 故 erest 直接 bind 到根 router（与生产 /api 子 router 区别仅在挂载点，路由逻辑同构）。
   const app = new web.Application();
+  // /mcp 必须在 bodyParser 之前（与生产 app.ts 同构）
+  app.use('/mcp', createMcpMiddleware(systemDb.db));
   app.use('/', web.component.bodyParser.json());
   app.use('/', web.component.bodyParser.urlencoded({ extended: true }));
   applySessionMiddleware(app);
@@ -102,6 +112,23 @@ export async function setupTest(): Promise<TestSetup> {
   // initTest 接受 leizm/web 的 app.server（http.Server），归一化为随机端口
   api.initTest(app.server);
 
+  // erest 的 initTest 是**延迟 listen**：只有首次 erest 测试请求时才调 server.listen(0)。
+  // erest 自身的 test.session() 在 fetch 前 await ready() 门控，所以 erest 测试不受影响；
+  // 但 MCP Client SDK 用我们拼的 mcpUrl 直连 fetch，绕过 erest 门控——若此时 server 尚未
+  // listen，connect 会 EADDRNOTAVAIL（port 0）。故在此显式 listen(0) 并 await 'listening'，
+  // 拿到真实端口。erest 后续首次请求时 normalizeTestTarget 检测到 address() 已非 null，
+  // 直接复用此 server，不会重复 listen。
+  await new Promise<void>((resolve) => {
+    if (app.server.listening) return resolve();
+    app.server.listen(0, () => resolve());
+    app.server.unref?.();
+  });
+
+  // MCP 端点需要完整 URL（MCP Client SDK 用 URL 连接，不能只用 path）。
+  const addr = app.server.address();
+  const port = typeof addr === 'object' && addr ? addr.port : 0;
+  const mcpUrl = `http://127.0.0.1:${port}/mcp`;
+
   const session = () => api.test.session();
 
   const adminSession = async () => {
@@ -110,13 +137,14 @@ export async function setupTest(): Promise<TestSetup> {
     return s;
   };
 
-  const insertToken = async (
+  // 内部：插 token 行，返回 {plain, id}
+  const insertTokenRow = async (
     perms: { tables: string[]; actions: string[] },
     opts?: { isActive?: boolean; expiresAt?: number | null },
   ) => {
     const plain = 'oa_testtoken_' + Math.random().toString(36).slice(2);
     const hash = createHash('sha256').update(plain).digest('hex');
-    await systemDb.db
+    const result = await systemDb.db
       .insertInto('api_token')
       .values({
         name: 'test',
@@ -129,8 +157,21 @@ export async function setupTest(): Promise<TestSetup> {
         created_at: Date.now(),
         updated_at: Date.now(),
       })
-      .execute();
-    return plain;
+      .executeTakeFirstOrThrow();
+    return { plain, id: Number(result.insertId) };
+  };
+
+  const insertToken = async (
+    perms: { tables: string[]; actions: string[] },
+    opts?: { isActive?: boolean; expiresAt?: number | null },
+  ) => (await insertTokenRow(perms, opts)).plain;
+
+  const insertTokenWithId = async (
+    perms: { tables: string[]; actions: string[] },
+    opts?: { isActive?: boolean; expiresAt?: number | null },
+  ) => {
+    const r = await insertTokenRow(perms, opts);
+    return { plain: r.plain, id: r.id };
   };
 
   const cleanup = async () => {
@@ -139,7 +180,17 @@ export async function setupTest(): Promise<TestSetup> {
     rmSync(dir, { recursive: true, force: true });
   };
 
-  return { api, systemDb: systemDb.db, businessDbPath, session, adminSession, insertToken, cleanup };
+  return {
+    api,
+    systemDb: systemDb.db,
+    businessDbPath,
+    mcpUrl,
+    session,
+    adminSession,
+    insertToken,
+    insertTokenWithId,
+    cleanup,
+  };
 }
 
 /** 在业务库直接建一张表（绕过 API，准备导入测试数据） */
