@@ -11,7 +11,9 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "description": "one-api 纯逻辑数据引擎（元数据驱动 + 动态 SQL，无 HTTP/UI）",
   "license": "MIT",

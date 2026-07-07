@@ -7,7 +7,7 @@
   "bin": {
     "one-api-cli": "./dist/index.js"
   },
-  "files": ["dist"],
+  "files": ["dist", "CHANGELOG.md", "LICENSE"],
   "description": "one-api 终端工具（远程模式走 SDK + 本地直连模式走 engine）",
   "license": "MIT",
   "author": "Yourtion <yourtion@gmail.com>",

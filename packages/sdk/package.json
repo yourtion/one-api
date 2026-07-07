@@ -10,7 +10,7 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": ["dist", "CHANGELOG.md", "LICENSE"],
   "description": "one-api HTTP CRUD 客户端（基于 fetch，isomorphic，对接 /api/data/*）",
   "license": "MIT",
   "author": "Yourtion <yourtion@gmail.com>",
