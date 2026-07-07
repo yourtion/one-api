@@ -1,0 +1,16 @@
+{
+  "name": "@1api/docs",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "docs:dev": "vitepress dev",
+    "docs:build": "vitepress build",
+    "docs:preview": "vitepress preview",
+    "gen:api-docs": "tsx scripts/gen-api-docs.ts"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.3",
+    "tsx": "^4.0.0"
+  }
+}
