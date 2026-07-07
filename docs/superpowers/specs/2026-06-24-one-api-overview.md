@@ -342,8 +342,9 @@ const Errors = {
 | 3 | 管理界面 | `apps/web`（Vue3 + element-plus + vue-json-ui-editor） | 单进程一键启动 = API + 后台 |
 | 4 | MCP 服务 | `apps/server` 内 `/mcp` 端点 | AI agent 连 /mcp 读写数据、自主建表 |
 | 5 | SDK + CLI | `packages/sdk` + `packages/cli` | 程序化调用 + 人类终端操作 |
+| 6 | 生态分发 | `@1api/*` npm 发包 + VitePress 文档站 | 四个 npm 包可装可用 + 文档站（含 erest 自动 API 参考） |
 
-**依赖关系**：Phase 1 是地基；Phase 2/3 都依赖 Phase 1；Phase 4（MCP）**依赖 Phase 1 + Phase 2**（复用 token 鉴权与路由装配，不可与 Phase 2 并行）；Phase 5 依赖 Phase 2（sdk 走 HTTP）和 Phase 1（cli 本地直连用 engine）。
+**依赖关系**：Phase 1 是地基；Phase 2/3 都依赖 Phase 1；Phase 4（MCP）**依赖 Phase 1 + Phase 2**（复用 token 鉴权与路由装配，不可与 Phase 2 并行）；Phase 5 依赖 Phase 2（sdk 走 HTTP）和 Phase 1（cli 本地直连用 engine）；Phase 6 依赖 Phase 1-5（发包内容 + 文档对象）。
 
 详见各 phase spec。
 

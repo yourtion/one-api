@@ -14,8 +14,8 @@ one-api/
 │   ├── shared/   # @1api/shared —— 前后端共享类型 + 类型映射核心
 │   ├── engine/   # @1api/engine —— 纯逻辑数据引擎（无 HTTP/UI 概念）
 │   ├── sdk/      # @1api/sdk —— HTTP CRUD 客户端（基于 fetch，供程序化消费）
-│   └── cli/      # one-api-cli —— 终端工具（远程模式走 SDK + 本地直连模式走 engine）
-├── apps/         # server / web
+│   └── cli/      # @1api/cli（命令名 one-api-cli）—— 终端工具（远程模式走 SDK + 本地直连模式走 engine）
+├── apps/         # server / web / docs（VitePress 文档站）
 └── docs/superpowers/{specs,plans}/
 ```
 
@@ -23,10 +23,11 @@ one-api/
 
 **分期进度：**
 - Phase 1（shared + engine）：✅ 已完成并合入 main
-- Phase 2（HTTP API 服务）：✅ 已完成（apps/server，worktree 待合入 main）
-- Phase 3（管理界面 apps/web）：✅ 已完成（worktree 待合入 main）
-- Phase 4（MCP）：✅ 已完成
-- Phase 5（SDK + CLI）：✅ 已完成（packages/sdk + packages/cli，worktree 待合入 main）
+- Phase 2（HTTP API 服务）：✅ 已完成并合入 main
+- Phase 3（管理界面 apps/web）：✅ 已完成并合入 main
+- Phase 4（MCP）：✅ 已完成并合入 main
+- Phase 5（SDK + CLI）：✅ 已完成并合入 main
+- Phase 6（生态分发）：✅ 已完成（npm 发包 @1api/shared/engine/sdk/cli @ 0.1.0 + VitePress 文档站 + erest 自动 API 文档）
 
 设计依据见 `docs/superpowers/specs/2026-06-24-one-api-overview.md` + 各 phase spec。
 
