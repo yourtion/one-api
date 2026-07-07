@@ -28,7 +28,7 @@ pnpm start
 | [`@1api/shared`](./packages/shared) | 前后端共享类型 + 类型映射 |
 | [`@1api/engine`](./packages/engine) | 纯逻辑数据引擎（无 HTTP/UI） |
 | [`@1api/sdk`](./packages/sdk) | HTTP CRUD 客户端（基于 fetch） |
-| [`one-api-cli`](./packages/cli) | 终端工具（远程 + 本地直连双模式） |
+| [`@1api/cli`](./packages/cli) | 终端工具（命令名 `one-api-cli`，远程 + 本地直连双模式） |
 
 ## 文档
 

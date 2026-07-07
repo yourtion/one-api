@@ -1,11 +1,11 @@
-# one-api-cli
+# @1api/cli
 
-> one-api 终端工具。远程模式走 SDK 对接 server，本地直连模式直接操作 SQLite（不经 HTTP）。
+> one-api 终端工具（命令名 `one-api-cli`）。远程模式走 SDK 对接 server，本地直连模式直接操作 SQLite（不经 HTTP）。
 
 ## 安装
 
 ```bash
-npm install -g one-api-cli
+npm install -g @1api/cli
 ```
 
 ## 快速开始
