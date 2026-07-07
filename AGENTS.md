@@ -12,8 +12,10 @@
 one-api/
 ├── packages/
 │   ├── shared/   # @1api/shared —— 前后端共享类型 + 类型映射核心
-│   └── engine/   # @1api/engine —— 纯逻辑数据引擎（无 HTTP/UI 概念）
-├── apps/         # server / web（Phase 2/3 起接入）
+│   ├── engine/   # @1api/engine —— 纯逻辑数据引擎（无 HTTP/UI 概念）
+│   ├── sdk/      # @1api/sdk —— HTTP CRUD 客户端（基于 fetch，供程序化消费）
+│   └── cli/      # one-api-cli —— 终端工具（远程模式走 SDK + 本地直连模式走 engine）
+├── apps/         # server / web
 └── docs/superpowers/{specs,plans}/
 ```
 
@@ -23,7 +25,8 @@ one-api/
 - Phase 1（shared + engine）：✅ 已完成并合入 main
 - Phase 2（HTTP API 服务）：✅ 已完成（apps/server，worktree 待合入 main）
 - Phase 3（管理界面 apps/web）：✅ 已完成（worktree 待合入 main）
-- Phase 4（MCP）/ Phase 5（SDK+CLI）：待启动
+- Phase 4（MCP）：✅ 已完成
+- Phase 5（SDK + CLI）：✅ 已完成（packages/sdk + packages/cli，worktree 待合入 main）
 
 设计依据见 `docs/superpowers/specs/2026-06-24-one-api-overview.md` + 各 phase spec。
 
@@ -40,6 +43,8 @@ one-api/
 | Web/API（server） | @leizm/web + **erest ^3.2**（`@erest/leizmweb` adapter + `createERest`），见 §4 |
 | 管理界面（web） | Vue 3.5 + Vite 5 + element-plus 2.11（全量注册）+ Pinia 2 + vue-router 4 + vue-json-ui-editor 3.0.1（数据编辑表单）+ axios 1。美学方向"Control Console"（翡翠青主色 + Manrope/JetBrains Mono） |
 | Zod（server） | zod ^4（erest 3.2+ 列为 peerDependency，**server 须直接依赖**，不能只靠传递） |
+| SDK（packages/sdk） | @1api/sdk —— 基于 fetch 的 HTTP CRUD 客户端，**零运行时依赖**（仅 @1api/shared 类型）。对接 `/api/data/*` 对外通道（Bearer token），统一信封解包 → `OneApiError`。isomorphic（Node + 浏览器），tsconfig 加 `"DOM"` lib 提供 fetch/Response 类型 |
+| CLI（packages/cli） | one-api-cli —— commander ^15 + @inquirer/prompts ^8 + cli-table3 ^0.6 + tsup ^8（构建 bin）。远程模式走 SDK，本地直连模式走 engine（`internal:true` 跳过 is_published/is_editable）。配置持久化 `~/.one-api-cli/config.json` |
 
 **三个"会咬人"的 tsconfig 开关（`tsconfig.base.json`，不要关掉）：**
 
@@ -215,3 +220,17 @@ Phase 5（SDK+CLI，依赖 Phase 1+2）
 | **engine 把 boolean/datetime 归一为 integer** | createModel 传 `jsonType:'boolean'`，meta 存回变 `integer`（SQLite 存 INTEGER，反射时 sqliteType→jsonType 反推） | 前端 boolean→switch / datetime→date-picker 分支是防御性代码（实际 meta 里这两类字段 jsonType 都是 integer → el-input-number）。不影响功能，知识：engine 的 jsonType 以 SQLite 存储类型为准。 |
 | **buildApp 内 erest api 是全局单例** | 多次调 buildApp（如每个测试用例各起一个 server）→ registerAuthRoutes 重复注册同名路由抛错 | 静态托管测试在 beforeAll 只 buildApp 一次、复用 server 跑全部用例。setupTest 用 `createERest` 创建新实例避免此问题。 |
 | **`@` alias 必须 vite/vitest/tsconfig 三处对齐** | 只在 vitest 配 `@`→src，vite 和 tsconfig 没配 → 测试过但 `vite build`/`vue-tsc` 找不到 `@/...` | vite.config.ts 的 resolve.alias + tsconfig.json 的 baseUrl/paths + vitest.config.ts 三处都配 `@`→src（见 apps/web Task 1 review 修复）。 |
+
+## 附录：Phase 5 踩坑教训（勿重蹈）
+
+| 坑 | 现象 | 对策 |
+|---|---|---|
+| **SDK 的 fetch 类型来源** | `packages/sdk` 用原生 fetch，但 `tsconfig.base.json` 只设 `lib:["ES2022"]`，且 sdk 不依赖 `@types/node` → typecheck 报 `Cannot find name 'fetch'/'Response'/'RequestInit'/'URL'` | SDK 自身 tsconfig 加 `"lib": ["ES2022", "DOM"]`（DOM 提供 fetch/Response/URL 类型，Node 18+ 原生 fetch 与 DOM fetch 类型兼容）。SDK 是 isomorphic（Node+浏览器），DOM lib 是标准方案。server 包用的是 `@types/node`（Node 专属），SDK 选 DOM lib 更贴合「库」定位。 |
+| **测试 baseUrl 是 `/data` 非 `/api/data`** | server 的 `setupTest()` 在**根路径**挂载 erest（`api.bind(apiRouter)` 后 `app.use('/', apiRouter)`），而非生产 `buildApp()` 的 `/api` 子挂载 → 集成测试里 data 路由在 `/data/*`（不是 `/api/data/*`） | 测试环境 `baseUrl = ${origin}/data`；生产 RemoteConnection 用 `${cfg.host}/api/data`（index.ts getConnection 拼接）。跨包集成测试（SDK/CLI 连临时 server）务必用 `/data`，否则 404。 |
+| **vitest alias 指向目录 vs index.ts** | 集成测试用 `import { setupTest } from '@1api/server/__tests__/helpers.js'`（子路径 import）；若 vitest alias 把 `@1api/server` 映射到 `apps/server/src/index.ts`，子路径会拼成 `index.ts/__tests__/helpers.js` 解析失败 | alias 指向**目录** `apps/server/src`（非 index.ts），让子路径 `@1api/server/__tests__/helpers.js` 正确解析为 `apps/server/src/__tests__/helpers.ts`。裸 import 的包（shared/engine/sdk）仍指 index.ts。 |
+| **commander 全局选项同名冲突** | CLI 顶层 program 与 connect 子命令都定义 `-H/-T/-D/-S`；commander 把值挂在 **program 层**，connect action 的 `opts` 参数取不到 → `connect --host X --token Y` 误报「需要 --host + --token」 | connect action 内用 `this.optsWithGlobals()`（commander ^15 原生方法）合并 program + 子命令层选项。不要假设 `action(opts)` 的 opts 含全局 flag。 |
+| **commander `parseAsync` argv 不能带 node 前缀** | 测试里 `program.parseAsync(['node', 'cli', ...args], { from: 'user' })` → commander 找名为 `node` 的命令静默失败 | `from: 'user'` 模式下 argv **仅含用户参数**，直接传 `args`（`program.parseAsync(args, { from: 'user' })`），不带 `['node', 'cli']` 前缀。 |
+| **`tables-create` 的 `id:integer` 与 engine 默认主键冲突** | 用户传 `--fields id:integer`，parseFields 只产生 `{name,jsonType}` 不带 `isPrimary`；engine 的 createTable 在无显式主键时自动注入 `id INTEGER PRIMARY KEY AUTOINCREMENT`，与用户的 `id` 列冲突 → SQL 错误 | parseFields 识别 `id`+`integer` 约定，自动标记 `isPrimary/isAutoIncrement/nullable:false`（与 engine 默认主键策略对齐）。或要求用户显式传主键标记。 |
+| **tsup 检测 shebang 自动 chmod +x** | CLI bin 入口 `src/index.ts` 首行 `#!/usr/bin/env node`；tsup 构建时检测到 shebang 自动给 `dist/index.js` 加执行权限 | 直接在入口写 shebang，无需手动 chmod。`bin` 字段指 `./dist/index.js`，`pnpm link --global` 或 `npm i -g` 后命令直接可用。 |
+| **本地直连模式的 baseUrl 与 token 语义** | 本地直连模式（`--db`）不经 HTTP，但 `createLocalConnection` 仍接受 token 参数做系统库校验 | token 可选（`string \| null`）：null 表示信任本地（CLI 运行者有文件系统权限，token 校验非安全边界，更多是防误操作）。有 token 时走 `resolveLocalToken` sha256 比对 + is_active + expires_at 校验。 |
+| **engine.data 返回 void 与 Connection 接口不一致** | engine 的 `update/delete/incr` 返回 `Promise<void>`，但 Connection 接口（与 SDK 对齐）要求返回 `{ success: true }` | LocalConnection 的 update/delete/incr 包装 engine 调用后返回 `{ success: true }`；get 包装 `Row | undefined` → 不存在时抛错。RemoteConnection 直接透传 SDK（已返回 `{success:true}`）。 |

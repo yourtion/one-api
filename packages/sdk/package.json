@@ -1,0 +1,30 @@
+{
+  "name": "@1api/sdk",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@1api/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@1api/server": "workspace:*",
+    "@vitest/coverage-v8": "^3",
+    "typescript": "^5.8.0",
+    "vitest": "^3.0.0"
+  }
+}
