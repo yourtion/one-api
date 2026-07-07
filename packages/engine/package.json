@@ -1,7 +1,6 @@
 {
   "name": "@1api/engine",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -14,6 +13,32 @@
   "files": [
     "dist"
   ],
+  "description": "one-api 纯逻辑数据引擎（元数据驱动 + 动态 SQL，无 HTTP/UI）",
+  "license": "MIT",
+  "author": "Yourtion <yourtion@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourtion/one-api.git",
+    "directory": "packages/engine"
+  },
+  "homepage": "https://github.com/yourtion/one-api#readme",
+  "bugs": {
+    "url": "https://github.com/yourtion/one-api/issues"
+  },
+  "keywords": [
+    "one-api",
+    "ai-native",
+    "database",
+    "engine",
+    "sqlite",
+    "kysely"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
