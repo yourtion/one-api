@@ -1,2 +1,14 @@
-// @1api/sdk 入口；Task 2 填充。
-export const __SDK_VERSION = '0.0.0';
+// @1api/sdk 入口
+export { createClient } from './client.js';
+export type { OneApiClient, CreateClientOptions } from './client.js';
+export { OneApiError } from './error.js';
+// re-export shared 类型，便于消费侧一处导入
+export type {
+  TableMeta,
+  FieldMeta,
+  FieldMetaInput,
+  CreateModelOptions,
+  ListOptions,
+  ListResult,
+  FilterOperator,
+} from '@1api/shared';
