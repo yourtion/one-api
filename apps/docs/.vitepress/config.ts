@@ -6,6 +6,9 @@ export default defineConfig({
   description: 'AI native 数据库',
   base: '/',
   cleanUrls: true,
+  // erest 自动生成的 api-reference/*.md 含「测试服务器 http://localhost:3000/api」示例文本，
+  // VitePress 死链检查会误报。此处放行 localhost（非站内链接）。
+  ignoreDeadLinks: [/^https?:\/\/localhost/, /^https?:\/\/127\.0\.0\.1/],
   themeConfig: {
     logo: '/logo.svg',
     nav: [
@@ -42,8 +45,15 @@ export default defineConfig({
       '/api-reference/': [
         {
           text: 'API 参考',
-          // Task 11 生成后按实际产出补全 items
-          items: [],
+          // 由 scripts/gen-api-docs.ts 自动生成（erest docs.markdown）。
+          // 路由组路径为 erest 组级路径（/auth/* 等），生产挂在 /api 子 router → 实际 /api/auth/*。
+          items: [
+            { text: '概览', link: '/api-reference/index' },
+            { text: '鉴权（auth）', link: '/api-reference/auth' },
+            { text: '后台管理（admin）', link: '/api-reference/admin' },
+            { text: '数据 CRUD（data）', link: '/api-reference/data' },
+            { text: '错误码', link: '/api-reference/errors' },
+          ],
         },
       ],
       '/about/': [

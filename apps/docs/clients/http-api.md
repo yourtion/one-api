@@ -97,7 +97,7 @@ curl -X POST http://localhost:3000/api/data/_schema/tables/comments/fields \
 
 ## 错误码
 
-常见错误码（完整列表见 API 参考，即将上线）：
+常见错误码（完整列表见 [API 参考 - 错误码](/api-reference/errors)）：
 
 | code | HTTP | 含义 |
 | --- | --- | --- |
@@ -110,6 +110,6 @@ curl -X POST http://localhost:3000/api/data/_schema/tables/comments/fields \
 
 ## 下一步
 
-- 完整接口签名见 API 参考（自动生成，即将上线）。
+- 完整接口签名见 [API 参考](/api-reference/)（自动生成）。
 - 不想手写 HTTP？用 [SDK](./sdk) 封装好的客户端。
 - 让 AI 直接调用？看 [MCP 服务](./mcp)。

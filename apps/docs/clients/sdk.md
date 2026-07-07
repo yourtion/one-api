@@ -107,4 +107,4 @@ SDK 仅依赖标准 `fetch`：
 
 - [HTTP REST API](./http-api)：SDK 底层即是对它的封装。
 - [核心概念](../guide/concepts)：Token 权限与 `is_published` 在 SDK 中如何体现。
-- API 参考：完整接口签名（自动生成，即将上线）。
+- [API 参考](/api-reference/)：完整接口签名（自动生成）。
