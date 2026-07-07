@@ -162,6 +162,9 @@ importers:
         specifier: workspace:*
         version: link:../shared
     devDependencies:
+      '@1api/server':
+        specifier: workspace:*
+        version: link:../../apps/server
       '@vitest/coverage-v8':
         specifier: ^3
         version: 3.2.6(vitest@3.2.6(@types/debug@4.1.13)(@types/node@26.0.0)(jsdom@25.0.1)(tsx@4.22.4))

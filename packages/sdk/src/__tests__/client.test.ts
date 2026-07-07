@@ -73,6 +73,26 @@ describe('createClient + request 信封解包', () => {
     const c = createClient('http://x/api/data', 'oa_t', { fetch: spy as unknown as typeof fetch });
     await expect(c.describe('x')).rejects.toMatchObject({ code: 'NETWORK_ERROR' });
   });
+
+  it('成功响应但非信封结构 → throw OneApiError(NETWORK_ERROR)', async () => {
+    // content-type 是 JSON 且可解析，但 body 缺少 success 字段（异常协议）
+    const { fetch } = mockFetch({ body: { random: 'not-an-envelope' } });
+    vi.stubGlobal('fetch', fetch);
+    const c = createClient('http://x/api/data', 'oa_t', { fetch });
+    await expect(c.describe('x')).rejects.toMatchObject({ code: 'NETWORK_ERROR' });
+  });
+
+  it('业务错误信封缺 code/message → 回退默认值', async () => {
+    // success:false 但 error 不带 code/message → 走 ?? 默认分支
+    const { fetch } = mockFetch({ status: 500, body: { success: false, error: {} } });
+    vi.stubGlobal('fetch', fetch);
+    const c = createClient('http://x/api/data', 'oa_t', { fetch });
+    await expect(c.describe('x')).rejects.toMatchObject({
+      code: 'UNKNOWN_ERROR',
+      message: '请求失败',
+      statusCode: 500,
+    });
+  });
 });
 
 describe('各数据方法路径/body', () => {
