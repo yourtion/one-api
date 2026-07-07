@@ -180,7 +180,11 @@ export function parseWhere(expr: string): Record<string, [FilterOperator, unknow
     if (fi <= 0) continue;
     const field = key.slice(0, fi);
     const op = key.slice(fi + 2) as FilterOperator;
-    out[field] = [op, isNaN(Number(val)) ? val : Number(val)];
+    // 只在非空且严格是纯数字（无前导零）时才转数字：
+    // 避免空值 '' → Number('')===0；避免 '01234' → Number('01234')===1234 丢前导零。
+    // 接受 '0' 或 '123'，拒绝 ''、'01234'、'9.99'、'-5'。
+    const numVal = /^(0|[1-9]\d*)$/.test(val) ? Number(val) : val;
+    out[field] = [op, numVal];
   }
   return out;
 }

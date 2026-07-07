@@ -50,11 +50,14 @@ export function resolveConnectOptions(flag: {
   host?: string;
   token?: string;
   db?: string;
+  systemDb?: string;
 }): ConnectConfig | null {
   const file = loadConfig();
   // 本地模式：flag.db 或 file.mode==='local'
   if (flag.db) {
-    return { mode: 'local', dbPath: flag.db };
+    const cfg: ConnectConfig = { mode: 'local', dbPath: flag.db };
+    if (flag.systemDb) cfg.systemDbPath = flag.systemDb;
+    return cfg;
   }
   if (file?.mode === 'local' && file.dbPath) {
     // exactOptionalPropertyTypes：可选属性不可赋 undefined，条件挂载 systemDbPath。

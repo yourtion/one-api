@@ -58,6 +58,13 @@ describe('resolveConnectOptions 合并（flag > file）', () => {
     expect(cfg?.dbPath).toBe('/tmp/x.db');
   });
 
+  it('flag.db + flag.systemDb → 本地模式含 systemDbPath', () => {
+    const cfg = resolveConnectOptions({ db: '/tmp/x.db', systemDb: '/tmp/sys.db' });
+    expect(cfg?.mode).toBe('local');
+    expect(cfg?.dbPath).toBe('/tmp/x.db');
+    expect(cfg?.systemDbPath).toBe('/tmp/sys.db');
+  });
+
   it('flag host+token → 远程模式（覆盖文件）', () => {
     saveConfig({ mode: 'remote', host: 'http://file', token: 'oa_file' });
     const cfg = resolveConnectOptions({ host: 'http://override', token: 'oa_override' });

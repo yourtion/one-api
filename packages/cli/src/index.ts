@@ -26,7 +26,7 @@ program
 /** 解析全局 flag + 配置文件 → Connection（延迟建立：仅需要时）。 */
 async function getConnection(): Promise<Connection> {
   const opts = program.opts();
-  const cfg = resolveConnectOptions({ host: opts.host, token: opts.token, db: opts.db });
+  const cfg = resolveConnectOptions({ host: opts.host, token: opts.token, db: opts.db, systemDb: opts.systemDb });
   if (!cfg) {
     console.error('✗ 未配置连接。请先运行：one-api-cli connect --host <url> --token <t>（或 --db <path>）');
     process.exit(1);
