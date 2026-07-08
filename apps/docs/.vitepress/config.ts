@@ -4,8 +4,9 @@ export default defineConfig({
   lang: 'zh-CN',
   title: 'one-api',
   description: 'AI native 数据库',
-  // GitHub Pages 项目站点（yourtion.github.io/one-api/），base 必须与子路径一致
-  base: '/one-api/',
+  // 自定义域名 1api.js.org（根路径），base 用 /
+  // 若临时回退到 yourtion.github.io/one-api/，改回 '/one-api/'
+  base: '/',
   cleanUrls: true,
   // erest 自动生成的 api-reference/*.md 含「测试服务器 http://localhost:3000/api」示例文本，
   // VitePress 死链检查会误报。此处放行 localhost（非站内链接）。
