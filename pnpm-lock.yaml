@@ -248,6 +248,19 @@ importers:
       '@1api/web':
         specifier: workspace:*
         version: link:../../apps/web
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.0
+      '@vitest/coverage-v8':
+        specifier: ^3
+        version: 3.2.6(vitest@3.2.6(@types/debug@4.1.13)(@types/node@22.20.0)(jsdom@25.0.1)(tsx@4.22.4))
+      typescript:
+        specifier: ^5.8.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.6(@types/debug@4.1.13)(@types/node@22.20.0)(jsdom@25.0.1)(tsx@4.22.4)
 
   packages/shared:
     dependencies:
