@@ -1,0 +1,52 @@
+# CI：lint + typecheck + test 质量门
+# 触发：push 到 main、PR 到 main
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# 同一分支的新 run 取消旧的（省 CI 资源）
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      # typecheck 前必须先 build：engine 的 tsconfig project reference 依赖 shared/dist
+      - name: Build
+        run: pnpm -r build
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      # test 无需 build 前置：各包 vitest.config.ts 已配 resolve.alias 直走源码
+      - name: Test
+        run: pnpm -r test
