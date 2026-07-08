@@ -1,3 +1,6 @@
+export { createServer, type ServerHandle, type CreateServerOptions } from './server.js';
+export type { AppConfig } from './config/index.js';
+
 import { createServer } from './server.js';
 import { log } from './utils/logger.js';
 

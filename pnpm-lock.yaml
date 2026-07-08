@@ -239,6 +239,16 @@ importers:
         specifier: ^3.0.0
         version: 3.2.6(@types/debug@4.1.13)(@types/node@26.0.0)(jsdom@25.0.1)(tsx@4.22.4)
 
+  packages/serve:
+    dependencies:
+      '@1api/server':
+        specifier: workspace:*
+        version: link:../../apps/server
+    optionalDependencies:
+      '@1api/web':
+        specifier: workspace:*
+        version: link:../../apps/web
+
   packages/shared:
     dependencies:
       zod:
