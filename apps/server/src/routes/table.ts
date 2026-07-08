@@ -17,19 +17,10 @@ export function registerTableRoutes(api: ERest<Middleware>): void {
   const admin = api.group('admin').before(requireAdmin(getSystemDb()));
   const engine = () => getEngine();
 
-  admin.get('/tables').title('表列表').example({
-    name: '获取全部表',
-    input: {},
-    output: { rows: [{ id: 1, name: 'users', label: '用户', isPublished: true, isEditable: true }] },
-  }).registerTyped({}, async () => {
+  admin.get('/tables').title('表列表').registerTyped({}, async () => {
     return await engine().metadata.listMetas();  });
 
-  admin.get('/tables/:id').title('表详情').example({
-    name: '查询表详情',
-    path: '/tables/1',
-    input: {},
-    output: { id: 1, name: 'users', label: '用户', fields: [{ name: 'id', type: 'integer', pk: true }], primaryKey: 'id', isPublished: true, isEditable: true },
-  }).registerTyped(
+  admin.get('/tables/:id').title('表详情').registerTyped(
     { params: IdParam },
     async (req) => {
       const meta = await engine().metadata.getMeta(req.params.id);
@@ -37,11 +28,7 @@ export function registerTableRoutes(api: ERest<Middleware>): void {
     return meta;    },
   );
 
-  admin.post('/tables/import').title('导入已有表').example({
-    name: '导入已存在的物理表',
-    input: { name: 'posts' },
-    output: { id: 2, name: 'posts', label: 'posts', fields: [{ name: 'id', type: 'integer', pk: true }] },
-  }).registerTyped(
+  admin.post('/tables/import').title('导入已有表').registerTyped(
     { body: z.object({ name: z.string() }) },
     async (req) => {
       assertNotReserved(req.body.name);
@@ -49,20 +36,7 @@ export function registerTableRoutes(api: ERest<Middleware>): void {
     return meta;    },
   );
 
-  admin.post('/tables').title('新建模型').example({
-    name: '新建 users 模型',
-    input: {
-      name: 'users',
-      label: '用户',
-      fields: [
-        { name: 'id', type: 'integer', pk: true },
-        { name: 'name', type: 'text' },
-        { name: 'age', type: 'integer' },
-      ],
-      autoTimestamps: true,
-    },
-    output: { id: 1, name: 'users', label: '用户', fields: [{ name: 'id', type: 'integer', pk: true }], isPublished: false, isEditable: true },
-  }).registerTyped(
+  admin.post('/tables').title('新建模型').registerTyped(
     { body: CreateModelSchema },
     async (req) => {
       assertNotReserved(req.body.name);
@@ -76,12 +50,7 @@ export function registerTableRoutes(api: ERest<Middleware>): void {
     return meta;    },
   );
 
-  admin.put('/tables/:id').title('更新元数据').example({
-    name: '发布表',
-    path: '/tables/1',
-    input: { isPublished: true, label: '用户表' },
-    output: { id: 1, name: 'users', label: '用户表', isPublished: true, isEditable: true },
-  }).registerTyped(
+  admin.put('/tables/:id').title('更新元数据').registerTyped(
     {
       params: IdParam,
       body: z.object({
@@ -101,12 +70,7 @@ export function registerTableRoutes(api: ERest<Middleware>): void {
     return await engine().metadata.getMeta(req.params.id);    },
   );
 
-  admin.post('/tables/:id/refresh').title('刷新表结构').example({
-    name: '刷新表结构（物理表变更后同步）',
-    path: '/tables/1',
-    input: {},
-    output: { id: 1, name: 'users', label: '用户', fields: [{ name: 'id', type: 'integer', pk: true }] },
-  }).registerTyped(
+  admin.post('/tables/:id/refresh').title('刷新表结构').registerTyped(
     { params: IdParam },
     async (req) => {
       const meta = await engine().metadata.getMeta(req.params.id);
@@ -114,12 +78,7 @@ export function registerTableRoutes(api: ERest<Middleware>): void {
     return await engine().schema.refresh(meta.name);    },
   );
 
-  admin.delete('/tables/:id').title('取消注册').example({
-    name: '取消注册表（需二次确认）',
-    path: '/tables/1?confirm=true',
-    input: { confirm: true },
-    output: { success: true },
-  }).registerTyped(
+  admin.delete('/tables/:id').title('取消注册').registerTyped(
     { params: IdParam, query: z.object({ confirm: coerceBool }) },
     async (req) => {
       // coerceBool 正确处理字符串 'false'→false（z.coerce.boolean 会误判为 true）。

@@ -22,13 +22,6 @@ export function registerDataRoutes(api: ERest<Middleware>): void {
   data
     .get('/:table')
     .title('列表')
-    .example({
-      name: '查询 users 第一页',
-      path: '/users?page=1&size=20',
-      headers: { Authorization: 'Bearer oa_a3f9c2e8b1d7e6f5a4b3c2d1' },
-      input: { page: 1, size: 20 },
-      output: { rows: [{ id: 1, name: 'alice', age: 30 }, { id: 2, name: 'bob', age: 25 }], total: 2, page: 1, size: 20 },
-    })
     .before(checkPermission('read', { tableKey: 'table' }))
     .registerTyped(
       { params: TableParam, query: ListQuerySchema },
@@ -41,13 +34,6 @@ export function registerDataRoutes(api: ERest<Middleware>): void {
   data
     .get('/:table/schema')
     .title('表结构')
-    .example({
-      name: '获取 users 表结构',
-      path: '/users/schema',
-      headers: { Authorization: 'Bearer oa_a3f9c2e8b1d7e6f5a4b3c2d1' },
-      input: {},
-      output: { name: 'users', fields: [{ name: 'id', type: 'integer', pk: true }, { name: 'name', type: 'text' }, { name: 'age', type: 'integer' }], primaryKey: 'id' },
-    })
     .before(checkPermission('read', { tableKey: 'table' }))
     .registerTyped(
       { params: TableParam },
@@ -59,13 +45,6 @@ export function registerDataRoutes(api: ERest<Middleware>): void {
   data
     .get('/:table/records/:pk')
     .title('单条')
-    .example({
-      name: '查询单条记录',
-      path: '/users/records/1',
-      headers: { Authorization: 'Bearer oa_a3f9c2e8b1d7e6f5a4b3c2d1' },
-      input: {},
-      output: { id: 1, name: 'alice', age: 30 },
-    })
     .before(checkPermission('read', { tableKey: 'table' }))
     .registerTyped(
       { params: TablePkParam },
@@ -79,13 +58,6 @@ export function registerDataRoutes(api: ERest<Middleware>): void {
   data
     .post('/:table/records')
     .title('创建')
-    .example({
-      name: '新建一条用户',
-      path: '/users/records',
-      headers: { Authorization: 'Bearer oa_a3f9c2e8b1d7e6f5a4b3c2d1' },
-      input: { name: 'alice', age: 30 },
-      output: { id: 1, name: 'alice', age: 30 },
-    })
     .before(checkPermission('write', { tableKey: 'table' }))
     .registerTyped(
       { params: TableParam, body: z.anyObject() },
@@ -97,13 +69,6 @@ export function registerDataRoutes(api: ERest<Middleware>): void {
   data
     .put('/:table/records/:pk')
     .title('更新')
-    .example({
-      name: '更新单条记录',
-      path: '/users/records/1',
-      headers: { Authorization: 'Bearer oa_a3f9c2e8b1d7e6f5a4b3c2d1' },
-      input: { age: 31 },
-      output: { success: true },
-    })
     .before(checkPermission('write', { tableKey: 'table' }))
     .registerTyped(
       { params: TablePkParam, body: z.anyObject() },
@@ -116,13 +81,6 @@ export function registerDataRoutes(api: ERest<Middleware>): void {
   data
     .delete('/:table/records/:pk')
     .title('删除')
-    .example({
-      name: '删除单条记录',
-      path: '/users/records/1',
-      headers: { Authorization: 'Bearer oa_a3f9c2e8b1d7e6f5a4b3c2d1' },
-      input: {},
-      output: { success: true },
-    })
     .before(checkPermission('write', { tableKey: 'table' }))
     .registerTyped(
       { params: TablePkParam },
@@ -135,13 +93,6 @@ export function registerDataRoutes(api: ERest<Middleware>): void {
   data
     .post('/:table/incr')
     .title('自增')
-    .example({
-      name: 'age 字段自增 1',
-      path: '/users/incr',
-      headers: { Authorization: 'Bearer oa_a3f9c2e8b1d7e6f5a4b3c2d1' },
-      input: { pk: 1, field: 'age', count: 1 },
-      output: { success: true },
-    })
     .before(checkPermission('write', { tableKey: 'table' }))
     .registerTyped(
       {

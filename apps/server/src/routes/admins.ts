@@ -22,20 +22,12 @@ export function registerAdminRoutes(api: AppApi): void {
   const admin = api.group('admin').before(requireAdmin(getSystemDb()));
   const store = createAdminStore(getSystemDb());
 
-  admin.get('/admins').title('管理员列表').example({
-    name: '获取全部管理员',
-    input: {},
-    output: { rows: [{ id: 1, name: 'admin', nickname: '管理员', must_change_password: 0, created_at: 1700000000, updated_at: 1700000000 }] },
-  }).registerTyped({}, async () => {
+  admin.get('/admins').title('管理员列表').registerTyped({}, async () => {
     const rows = await store.list();
     return rows.map(toVO);
   });
 
-  admin.post('/admins').title('新建管理员').example({
-    name: '新建管理员（首登需改密）',
-    input: { name: 'ops', nickname: '运维', password: 'init123' },
-    output: { id: 2, name: 'ops', nickname: '运维', must_change_password: 1, created_at: 1700000000, updated_at: 1700000000 },
-  }).registerTyped(
+  admin.post('/admins').title('新建管理员').registerTyped(
     { body: z.object({ name: z.string(), nickname: z.string(), password: z.string().min(6) }) },
     async (req) => {
       const row = await store.insert({
@@ -48,12 +40,7 @@ export function registerAdminRoutes(api: AppApi): void {
     },
   );
 
-  admin.put('/admins/:id').title('更新管理员').example({
-    name: '更新昵称与重置密码',
-    path: '/admins/2',
-    input: { nickname: '运维同学', password: 'newpass789' },
-    output: { success: true },
-  }).registerTyped(
+  admin.put('/admins/:id').title('更新管理员').registerTyped(
     { params: IdParam, body: z.object({ nickname: z.string().optional(), password: z.string().min(6).optional() }) },
     async (req) => {
       const { id } = req.params;
@@ -66,12 +53,7 @@ export function registerAdminRoutes(api: AppApi): void {
     },
   );
 
-  admin.delete('/admins/:id').title('删除管理员').example({
-    name: '删除指定管理员（不可删自己）',
-    path: '/admins/2',
-    input: {},
-    output: { success: true },
-  }).registerTyped(
+  admin.delete('/admins/:id').title('删除管理员').registerTyped(
     { params: IdParam },
     async (req, ctx) => {
       const { id } = req.params;

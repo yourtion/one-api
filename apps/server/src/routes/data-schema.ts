@@ -19,21 +19,6 @@ export function registerDataSchemaRoutes(api: ERest<Middleware>): void {
   data
     .post('/_schema/tables')
     .title('新建模型（token）')
-    .example({
-      name: '通过 Token 新建 users 模型',
-      headers: { Authorization: 'Bearer oa_a3f9c2e8b1d7e6f5a4b3c2d1' },
-      input: {
-        name: 'users',
-        label: '用户',
-        fields: [
-          { name: 'id', type: 'integer', pk: true },
-          { name: 'name', type: 'text' },
-          { name: 'age', type: 'integer' },
-        ],
-        autoTimestamps: true,
-      },
-      output: { id: 1, name: 'users', label: '用户', fields: [{ name: 'id', type: 'integer', pk: true }], isPublished: false, isEditable: true },
-    })
     .before(checkPermission('schema', { tableFromBody: 'name' }))
     .registerTyped(
       { body: CreateModelSchema },
@@ -55,13 +40,6 @@ export function registerDataSchemaRoutes(api: ERest<Middleware>): void {
   data
     .post('/_schema/tables/:table/fields')
     .title('加字段（token）')
-    .example({
-      name: '给 users 表加 email 字段',
-      path: '/_schema/tables/users/fields',
-      headers: { Authorization: 'Bearer oa_a3f9c2e8b1d7e6f5a4b3c2d1' },
-      input: { field: { name: 'email', type: 'text' } },
-      output: { name: 'email', type: 'text' },
-    })
     .before(checkPermission('schema', { tableKey: 'table' }))
     .registerTyped(
       { params: TableParam, body: z.object({ field: z.record(z.string(), z.unknown()) }) },

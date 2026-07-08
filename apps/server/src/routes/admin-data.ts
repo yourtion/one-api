@@ -22,12 +22,7 @@ export function registerAdminDataRoutes(api: AppApi): void {
     return meta.name;
   }
 
-  admin.get('/tables/:id/data').title('数据列表').example({
-    name: '查询 users 表第一页',
-    path: '/tables/1/data?page=1&size=20',
-    input: { page: 1, size: 20 },
-    output: { rows: [{ id: 1, name: 'alice', age: 30 }, { id: 2, name: 'bob', age: 25 }], total: 2, page: 1, size: 20 },
-  }).registerTyped(
+  admin.get('/tables/:id/data').title('数据列表').registerTyped(
     { params: IdParam, query: ListQuerySchema },
     async (req) => {
       const name = await resolveName(req.params.id);
@@ -35,12 +30,7 @@ export function registerAdminDataRoutes(api: AppApi): void {
     return await engine().data.list(name, listOpts, INTERNAL);    },
   );
 
-  admin.get('/tables/:id/export').title('导出 CSV').example({
-    name: '导出 users 表为 CSV',
-    path: '/tables/1/export',
-    input: {},
-    output: { contentType: 'text/csv; charset=utf-8', body: 'id,name,age\r\n1,alice,30\r\n2,bob,25' },
-  }).registerTyped(
+  admin.get('/tables/:id/export').title('导出 CSV').registerTyped(
     { params: IdParam, query: ListQuerySchema },
     async (req, ctx) => {
       // CSV 导出绕过 envelope（非 JSON）：经 raw 手动写完整响应后调 ctx.reply.markSent()，
@@ -69,12 +59,7 @@ export function registerAdminDataRoutes(api: AppApi): void {
     },
   );
 
-  admin.get('/tables/:id/data/:pk').title('单条').example({
-    name: '查询单条记录',
-    path: '/tables/1/data/1',
-    input: {},
-    output: { id: 1, name: 'alice', age: 30 },
-  }).registerTyped(
+  admin.get('/tables/:id/data/:pk').title('单条').registerTyped(
     { params: IdPkParam },
     async (req) => {
       const name = await resolveName(req.params.id);
@@ -83,12 +68,7 @@ export function registerAdminDataRoutes(api: AppApi): void {
     return row;    },
   );
 
-  admin.post('/tables/:id/data').title('新增').example({
-    name: '新增一条记录',
-    path: '/tables/1/data',
-    input: { name: 'alice', age: 30 },
-    output: { id: 1, name: 'alice', age: 30 },
-  }).registerTyped(
+  admin.post('/tables/:id/data').title('新增').registerTyped(
     { params: IdParam, body: z.anyObject() },
     async (req) => {
       const name = await resolveName(req.params.id);
@@ -96,12 +76,7 @@ export function registerAdminDataRoutes(api: AppApi): void {
     return row;    },
   );
 
-  admin.put('/tables/:id/data/:pk').title('修改').example({
-    name: '修改一条记录',
-    path: '/tables/1/data/1',
-    input: { age: 31 },
-    output: { success: true },
-  }).registerTyped(
+  admin.put('/tables/:id/data/:pk').title('修改').registerTyped(
     { params: IdPkParam, body: z.anyObject() },
     async (req) => {
       const name = await resolveName(req.params.id);
@@ -109,12 +84,7 @@ export function registerAdminDataRoutes(api: AppApi): void {
     return { success: true };    },
   );
 
-  admin.delete('/tables/:id/data/:pk').title('删除').example({
-    name: '删除一条记录',
-    path: '/tables/1/data/1',
-    input: {},
-    output: { success: true },
-  }).registerTyped(
+  admin.delete('/tables/:id/data/:pk').title('删除').registerTyped(
     { params: IdPkParam },
     async (req) => {
       const name = await resolveName(req.params.id);
