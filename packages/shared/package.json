@@ -1,7 +1,6 @@
 {
   "name": "@1api/shared",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -12,8 +11,35 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
+  "description": "one-api 前后端共享类型与类型映射（SQLite ↔ JSONSchema ↔ Zod）",
+  "license": "MIT",
+  "author": "Yourtion <yourtion@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourtion/one-api.git",
+    "directory": "packages/shared"
+  },
+  "homepage": "https://github.com/yourtion/one-api#readme",
+  "bugs": {
+    "url": "https://github.com/yourtion/one-api/issues"
+  },
+  "keywords": [
+    "one-api",
+    "ai-native",
+    "database",
+    "types",
+    "shared"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",

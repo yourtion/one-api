@@ -1,14 +1,42 @@
 {
-  "name": "one-api-cli",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@1api/cli",
+  "version": "0.1.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
     "one-api-cli": "./dist/index.js"
   },
-  "files": ["dist"],
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "description": "one-api 终端工具（远程模式走 SDK + 本地直连模式走 engine）",
+  "license": "MIT",
+  "author": "Yourtion <yourtion@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourtion/one-api.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/yourtion/one-api#readme",
+  "bugs": {
+    "url": "https://github.com/yourtion/one-api/issues"
+  },
+  "keywords": [
+    "one-api",
+    "ai-native",
+    "database",
+    "cli",
+    "terminal",
+    "command-line"
+  ],
+  "preferGlobal": true,
+  "publishConfig": { "access": "public" },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc -p tsconfig.json --noEmit",

@@ -1,0 +1,17 @@
+{
+  "name": "@1api/docs",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "docs:dev": "vitepress dev",
+    "docs:build": "tsx scripts/gen-api-docs.ts && vitepress build",
+    "docs:preview": "vitepress preview",
+    "gen:api-docs": "tsx scripts/gen-api-docs.ts"
+  },
+  "devDependencies": {
+    "@erest/leizmweb": "^3.2.1",
+    "vitepress": "^1.6.3",
+    "tsx": "^4.0.0"
+  }
+}

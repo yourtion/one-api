@@ -1,7 +1,6 @@
 {
   "name": "@1api/sdk",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -11,7 +10,33 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": ["dist", "CHANGELOG.md", "LICENSE"],
+  "description": "one-api HTTP CRUD 客户端（基于 fetch，isomorphic，对接 /api/data/*）",
+  "license": "MIT",
+  "author": "Yourtion <yourtion@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourtion/one-api.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/yourtion/one-api#readme",
+  "bugs": {
+    "url": "https://github.com/yourtion/one-api/issues"
+  },
+  "keywords": [
+    "one-api",
+    "ai-native",
+    "database",
+    "sdk",
+    "http-client",
+    "fetch"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
