@@ -32,7 +32,7 @@ pnpm start
 
 ## 文档
 
-完整文档见文档站（Phase 6 部署后更新链接）。设计文档见 [`docs/superpowers/specs/`](./docs/superpowers/specs/)。
+完整文档见 [文档站](https://yourtion.github.io/one-api/)。设计文档见 [`docs/superpowers/specs/`](./docs/superpowers/specs/)。
 
 ## 开发
 
