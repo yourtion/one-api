@@ -5,12 +5,14 @@ import { AppError } from '@1api/shared';
 import { resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { log } from './utils/logger.js';
 import { getSystemDb } from './core/system-db.js';
 import { createMcpMiddleware } from './modules/mcp/transport.js';
 
 // 当前模块目录（dist 下，静态根默认相对此处的 static/admin）
 const here = fileURLToPath(new URL('.', import.meta.url));
+const require = createRequire(import.meta.url);
 import { applySessionMiddleware } from './middlewares/session.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerTableRoutes } from './routes/table.js';
@@ -22,6 +24,26 @@ import { registerDataSchemaRoutes } from './routes/data-schema.js';
 import { api } from './api/instance.js';
 
 /**
+ * 解析 /admin 静态根目录，优先级：
+ * 1. options.adminRoot（serve 注入，生产路径）
+ * 2. ONE_API_ADMIN_ROOT env（测试注入）
+ * 3. require.resolve('@1api/web/dist') —— @1api/web 包已装（monorepo 内 / serve 包）
+ * 4. 仓库内 apps/web/dist（纯源码开发兜底）
+ * 5. 都没有 → undefined（纯 API 模式，不挂 web）
+ */
+function resolveAdminRoot(injected?: string): string | undefined {
+  if (injected) return injected;
+  const envRoot = process.env['ONE_API_ADMIN_ROOT'];
+  if (envRoot) return envRoot;
+  try {
+    const pkgPath = require.resolve('@1api/web/package.json');
+    return resolvePath(pkgPath, '../dist');
+  } catch { /* @1api/web 未装，继续 */ }
+  const devPath = resolvePath(here, '../../web/dist');
+  return existsSync(devPath) ? devPath : undefined;
+}
+
+/**
  * 装配 @leizm/web app（纯 erest-first）：
  * 1. 全局前置中间件：bodyParser + 请求日志
  * 2. healthz 等非 /api 端点挂在根 /（原生 router，留给 Phase3 web 静态等）
@@ -31,7 +53,7 @@ import { api } from './api/instance.js';
  *
  * routes 直接从全局单例（api / getSystemDb）取依赖，无需传参。
  */
-export function buildApp(): web.Application {
+export function buildApp(options?: { adminRoot?: string }): web.Application {
   const app = new web.Application();
 
   // 1. 全局前置中间件
@@ -70,16 +92,12 @@ export function buildApp(): web.Application {
   app.use('/api', apiRouter);
 
   // 3.5 Phase 3：/admin 静态托管 + SPA history fallback
-  // 静态根：优先环境变量（测试注入），默认 dist 上一级 static/admin
-  // （here 指向 apps/server/dist/，web 产物输出到 apps/server/static/admin）
-  const ADMIN_ROOT = process.env['ONE_API_ADMIN_ROOT'] ?? resolvePath(here, '../static/admin');
-  if (existsSync(ADMIN_ROOT)) {
-    // (a) 真实静态资源（assets 等）；index:false → index.html 由 fallback 统一发
+  // 静态根由 resolveAdminRoot 决定（options 注入 > env > @1api/web 包 > 仓库兜底 > undefined 纯 API）
+  // ⚠️ fallback 中间件保持原模式：serveStatic {index:false,fallthrough:true} + app.use('/admin', serve indexFile)。
+  //   不能用裸 '*'（path-to-regexp v6 抛 Unexpected MODIFIER）；不能用 router.get('/admin/:splat*')（不匹配 /admin/ 空 splat）。
+  const ADMIN_ROOT = resolveAdminRoot(options?.adminRoot);
+  if (ADMIN_ROOT && existsSync(ADMIN_ROOT)) {
     app.use('/admin', web.component.serveStatic(ADMIN_ROOT, { index: false, fallthrough: true }));
-    // (b) SPA history fallback：use 前缀匹配 /admin、/admin/、/admin/** 任意路径；
-    //     未命中真实文件的请求统一回 index.html。
-    //     ⚠️ 不能用裸 '*'（path-to-regexp v6 抛 Unexpected MODIFIER）；
-    //     不能用 router.get('/admin/:splat*')（不匹配 /admin/ 空 splat）。
     const indexFile = resolvePath(ADMIN_ROOT, 'index.html');
     app.use('/admin', (ctx) => {
       ctx.response.file(indexFile);
