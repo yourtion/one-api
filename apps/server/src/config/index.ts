@@ -17,7 +17,7 @@ function envInt(name: string, def: number): number {
 }
 
 export function loadConfig(): AppConfig {
-  const dataDir = join(homedir(), '.one-api');
+  const dataDir = process.env['ONE_API_DATA_DIR'] ?? join(homedir(), '.one-api');
   return {
     port: envInt('PORT', 3000),
     systemDbPath: process.env['ONE_API_SYSTEM_DB'] ?? join(dataDir, 'system.db'),
