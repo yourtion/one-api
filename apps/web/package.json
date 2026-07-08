@@ -1,8 +1,10 @@
 {
   "name": "@1api/web",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "private": false,
   "type": "module",
+  "files": ["dist", "CHANGELOG.md", "LICENSE"],
+  "publishConfig": { "access": "public" },
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit -p tsconfig.json && vite build",

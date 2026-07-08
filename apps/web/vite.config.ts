@@ -28,8 +28,8 @@ export default defineConfig({
     },
   },
   build: {
-    // 产物直接输出到 server 静态目录（相对 apps/web 出发是 ../server/static/admin）
-    outDir: resolve(here, '../server/static/admin'),
+    // 产物输出到本包 dist/（@1api/web 作为独立可发包，产物随包发布）
+    outDir: resolve(here, 'dist'),
     emptyOutDir: true,
   },
   server: {
