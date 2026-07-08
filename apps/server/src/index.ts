@@ -3,6 +3,7 @@ export type { AppConfig } from './config/index.js';
 
 import { createServer } from './server.js';
 import { log } from './utils/logger.js';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 async function main(): Promise<void> {
   const handle = createServer();
@@ -30,7 +31,15 @@ async function main(): Promise<void> {
   process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
 
-main().catch((err) => {
-  log.error('启动失败: %s', (err as Error).stack ?? String(err));
-  process.exit(1);
-});
+// 仅当本文件作为 CLI 直接入口（node dist/index.js）时才启动；
+// 被 import（如 @1api/serve 引用）时只暴露库 API，不自动 run。
+const isMainEntry =
+  process.argv[1] !== undefined &&
+  fileURLToPath(import.meta.url) === fileURLToPath(pathToFileURL(process.argv[1]).href);
+
+if (isMainEntry) {
+  main().catch((err) => {
+    log.error('启动失败: %s', (err as Error).stack ?? String(err));
+    process.exit(1);
+  });
+}
