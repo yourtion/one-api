@@ -6,7 +6,7 @@ export default defineConfig({
   description: 'AI native 数据库',
   // 自定义域名 1api.js.org（根路径），base 用 /
   // 若临时回退到 yourtion.github.io/one-api/，改回 '/one-api/'
-  base: '/',
+  base: '/one-api/',
   cleanUrls: true,
   // erest 自动生成的 api-reference/*.md 含「测试服务器 http://localhost:3000/api」示例文本，
   // VitePress 死链检查会误报。此处放行 localhost（非站内链接）。
