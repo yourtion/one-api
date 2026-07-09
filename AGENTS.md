@@ -14,12 +14,13 @@ one-api/
 │   ├── shared/   # @1api/shared —— 前后端共享类型 + 类型映射核心
 │   ├── engine/   # @1api/engine —— 纯逻辑数据引擎（无 HTTP/UI 概念）
 │   ├── sdk/      # @1api/sdk —— HTTP CRUD 客户端（基于 fetch，供程序化消费）
-│   └── cli/      # @1api/cli（命令名 one-api-cli）—— 终端工具（远程模式走 SDK + 本地直连模式走 engine）
-├── apps/         # server / web / docs（VitePress 文档站）
+│   ├── cli/      # @1api/cli（命令名 one-api-cli）—— 终端工具（远程模式走 SDK + 本地直连模式走 engine）
+│   └── serve/    # @1api/serve（命令名 1api）—— 一键启动分发薄壳（依赖 server，optionalDependencies web）
+├── apps/         # server（@1api/server，导出 createServer）/ web（@1api/web，静态产物包）/ docs（VitePress 文档站）
 └── docs/superpowers/{specs,plans}/
 ```
 
-**包依赖拓扑：** `shared` ← `engine` ← `server`/`web`/`sdk`/`cli`。`engine` 只接收 DB 句柄，不依赖任何传输层。
+**包依赖拓扑：** `shared` ← `engine` ← `server` ← `serve`；`web`（纯静态产物）← `serve`（optionalDependencies）；`sdk`/`cli` ← `engine`/`shared`。`engine` 只接收 DB 句柄，不依赖任何传输层。`server` 通过 `createServer()` 库函数被 `serve` 复用（`apps/server/src/index.ts` 有 `isMainEntry` 守卫，被 import 时只暴露库 API 不自动 run）。
 
 **分期进度：**
 - Phase 1（shared + engine）：✅ 已完成并合入 main
@@ -28,6 +29,7 @@ one-api/
 - Phase 4（MCP）：✅ 已完成并合入 main
 - Phase 5（SDK + CLI）：✅ 已完成并合入 main
 - Phase 6（生态分发）：✅ 已完成（npm 发包 @1api/shared/engine/sdk/cli @ 0.1.0 + VitePress 文档站 + erest 自动 API 文档）
+- Phase 7（一键启动分发）：✅ 已完成（新建 `@1api/serve` 薄壳包 bin `1api` + `@1api/server` 库化导出 `createServer()` + `@1api/web` 独立发包；`adminRoot` 三态语义 string/null/undefined；`isMainEntry` 守卫使 index.ts 兼具 CLI 入口与库入口）
 
 设计依据见 `docs/superpowers/specs/2026-06-24-one-api-overview.md` + 各 phase spec。
 

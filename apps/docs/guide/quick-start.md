@@ -5,14 +5,14 @@
 ## 1. 启动服务
 
 ```bash
-git clone https://github.com/yourtion/one-api.git
-cd one-api
-pnpm install
-pnpm -r build
-pnpm start
+npx @1api/serve
 ```
 
-`pnpm start` 等价于 `node apps/server/dist/index.js`——**单进程**同时提供 `/api/*` 数据接口和 `/admin` 管理界面。默认监听 `http://localhost:3000`。
+无需 clone 仓库。`npx @1api/serve` 一个进程同时提供 `/api/*` 数据接口、`/admin` 管理界面和 `/mcp` 服务。默认监听 `http://localhost:3000`。
+
+::: tip 全局安装后可省略 npx
+`npm install -g @1api/serve` 之后直接用 `1api` 命令。启动选项见 [安装与部署](./install)。
+:::
 
 ## 2. 打开管理界面
 

@@ -10,6 +10,7 @@ one-api 采用分阶段演进，目前核心能力已全部就位。
 - **Phase 4 — MCP 服务**（`/mcp`）：Streamable HTTP transport，9 个 tools 让 AI agent 直接读写数据与演进 schema。
 - **Phase 5 — SDK 与 CLI**：`@1api/sdk`（HTTP CRUD 客户端）与 `@1api/cli`（终端工具 `one-api-cli`，支持远程与本地直连）。
 - **Phase 6 — 分发**：npm 包发布（`@1api/shared` / `engine` / `sdk` / `cli`）与文档站。
+- **Phase 7 — 一键启动分发**：`@1api/serve`（命令 `1api`）一键启动带可选管理界面的完整服务，`@1api/server` / `@1api/web` 独立发包。终端用户 `npx @1api/serve` 即用，无需 clone 仓库。
 
 ## 后续计划
 
