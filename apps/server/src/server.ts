@@ -16,8 +16,13 @@ export interface ServerHandle {
 export interface CreateServerOptions {
   /** 覆盖 loadConfig 的字段（flag+env 合并后传入） */
   config?: Partial<AppConfig>;
-  /** 外部注入的 web 静态根目录；不传则走 buildApp 兜底探测 */
-  adminRoot?: string;
+  /**
+   * web 静态根目录，三态语义：
+   * - string：用此路径（serve 注入的生产路径）
+   * - null：明确禁用 web（--no-web）
+   * - undefined：走 buildApp 兜底探测（env > @1api/web 包 > 仓库兜底）
+   */
+  adminRoot?: string | null;
 }
 
 /**

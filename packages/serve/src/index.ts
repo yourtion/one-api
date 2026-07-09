@@ -7,16 +7,22 @@ async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const config = mergeConfig(args);
 
-  let adminRoot: string | undefined;
-  if (!args.noWeb) {
+  // adminRoot 三态：
+  // - --no-web → null（明确禁用，buildApp 不兜底探测）
+  // - web 已装 → dist 路径
+  // - web 未装 → undefined（让 buildApp 兜底探测；仓库内能找到 web/dist）
+  let adminRoot: string | null | undefined;
+  if (args.noWeb) {
+    adminRoot = null;
+  } else {
     adminRoot = resolveWebDist();
     if (!adminRoot) {
       console.warn('⚠ @1api/web 未安装，以纯 API 模式启动。如需管理界面请安装 @1api/web 或去掉 --no-web。');
     }
   }
 
-  // exactOptionalPropertyTypes：adminRoot?: string 不接受显式 undefined，
-  // 故条件构造 options（仅当 adminRoot 存在时挂上该字段）。与 apps/server/src/server.ts:55 同款模式。
+  // exactOptionalPropertyTypes：adminRoot?: string | null 不接受显式 undefined，
+  // 故条件构造 options（仅当 adminRoot 非 undefined 时挂上该字段）。null 会被传递以触发禁用。
   const handle = createServer(adminRoot !== undefined ? { config, adminRoot } : { config });
   await handle.listen();
 

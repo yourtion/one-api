@@ -72,3 +72,43 @@ describe('serve 烟雾测试', () => {
     expect([200, 404]).toContain(r.status);
   });
 });
+
+// --no-web 回归：独立进程（erest api 全局单例，不可与上面实例共用），
+// 验证 adminRoot:null 真正跳过 web 挂载（曾因接口无法区分「未传」与「禁用」而失效）
+describe('serve --no-web 纯 API 模式', () => {
+  let noWebDir = '';
+  let noWebProc: ChildProcess | null = null;
+  let noWebBaseURL = '';
+
+  beforeAll(async () => {
+    noWebDir = mkdtempSync(join(tmpdir(), '1api-serve-noweb-'));
+    const port = 14098;
+    noWebBaseURL = `http://127.0.0.1:${port}`;
+    const entry = join(here, '..', '..', 'dist', 'index.js');
+    noWebProc = spawn('node', [entry, '--port', String(port), '--no-web', '--data-dir', noWebDir], {
+      env: { ...process.env },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    await waitReady(noWebProc);
+    await new Promise((r) => setTimeout(r, 300));
+  }, 20000);
+
+  afterAll(async () => {
+    if (noWebProc) {
+      noWebProc.kill('SIGTERM');
+      await new Promise<void>((r) => noWebProc!.on('exit', () => r()));
+    }
+    rmSync(noWebDir, { recursive: true, force: true });
+  });
+
+  it('/admin/ 返回 404（web 被明确禁用）', async () => {
+    const r = await fetch(noWebBaseURL + '/admin/');
+    expect(r.status).toBe(404);
+  });
+
+  it('/healthz 仍可用（API 不受影响）', async () => {
+    const r = await fetch(noWebBaseURL + '/healthz');
+    expect(r.status).toBe(200);
+    expect(((await r.json()) as { success: boolean }).success).toBe(true);
+  });
+});

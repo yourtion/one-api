@@ -24,15 +24,21 @@ import { registerDataSchemaRoutes } from './routes/data-schema.js';
 import { api } from './api/instance.js';
 
 /**
- * 解析 /admin 静态根目录，优先级：
- * 1. options.adminRoot（serve 注入，生产路径）
- * 2. ONE_API_ADMIN_ROOT env（测试注入）
- * 3. require.resolve('@1api/web/dist') —— @1api/web 包已装（monorepo 内 / serve 包）
- * 4. 仓库内 apps/web/dist（纯源码开发兜底）
- * 5. 都没有 → undefined（纯 API 模式，不挂 web）
+ * 解析 /admin 静态根目录，adminRoot 三态语义：
+ * - string  → 直接用此路径（serve 注入的生产路径）
+ * - null    → 明确禁用 web（--no-web），短路返回 undefined，不走兜底
+ * - undefined → 自动探测：env > @1api/web 包 > 仓库兜底 > undefined
+ *
+ * 自动探测优先级（仅 adminRoot === undefined 时）：
+ * 1. ONE_API_ADMIN_ROOT env（测试注入）
+ * 2. require.resolve('@1api/web/package.json') → ../dist（包已装）
+ * 3. 仓库内 apps/web/dist（纯源码开发兜底）
+ * 4. 都没有 → undefined（纯 API 模式，不挂 web）
  */
-function resolveAdminRoot(injected?: string): string | undefined {
-  if (injected) return injected;
+function resolveAdminRoot(injected: string | null | undefined): string | undefined {
+  // null = 明确禁用：必须短路，否则兜底探测会误挂 web（--no-web 失效）
+  if (injected === null) return undefined;
+  if (injected !== undefined) return injected;
   const envRoot = process.env['ONE_API_ADMIN_ROOT'];
   if (envRoot) return envRoot;
   try {
@@ -53,7 +59,7 @@ function resolveAdminRoot(injected?: string): string | undefined {
  *
  * routes 直接从全局单例（api / getSystemDb）取依赖，无需传参。
  */
-export function buildApp(options?: { adminRoot?: string }): web.Application {
+export function buildApp(options?: { adminRoot?: string | null }): web.Application {
   const app = new web.Application();
 
   // 1. 全局前置中间件
