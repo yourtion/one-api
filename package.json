@@ -12,6 +12,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "start": "node apps/server/dist/index.js",
+    "release": "pnpm -r build && pnpm -r typecheck && pnpm -r test && pnpm -r publish --no-git-checks --access public",
     "docs:dev": "pnpm --filter @1api/docs docs:dev",
     "docs:build": "pnpm --filter @1api/docs docs:build",
     "docs:gen-api": "pnpm --filter @1api/docs gen:api-docs"
