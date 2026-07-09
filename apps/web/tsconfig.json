@@ -10,7 +10,8 @@
     "types": ["vite/client"],
     "useDefineForClassFields": true,
     "noEmit": true,
-    "composite": true
+    "composite": true,
+    "tsBuildInfoFile": "../.tsbuildinfo/web.tsbuildinfo"
   },
   "references": [{ "path": "../../packages/shared" }],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"],

@@ -34,6 +34,8 @@ async function main(): Promise<void> {
         console.error(`关闭异常: ${(err as Error).message}`);
         process.exit(1);
       });
+    // 兜底：若 close 卡住（better-sqlite3 close 挂起、长连接等），3s 后强制退出，避免 npx 挂起
+    setTimeout(() => process.exit(1), 3000).unref();
   };
   process.on('SIGINT', () => shutdown());
   process.on('SIGTERM', () => shutdown());
