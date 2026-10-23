@@ -31,9 +31,9 @@ export interface TestSetup {
   businessDbPath: string;
   /** MCP 端点全路径（如 http://127.0.0.1:<port>/mcp），供 MCP Client SDK 连接 */
   mcpUrl: string;
-  /** 走 erest initTest 的测试客户端（无鉴权态，独立 cookie jar） */
+  /** 走 erest initTest 的测试客户端（同一 api 实例的 session 共享 cookie jar） */
   session: () => TestSession;
-  /** admin/123456 登录，返回已建立会话的 TestSession（cookie 已落 jar，后续请求自动带） */
+  /** 将默认管理员设为已初始化后以 admin/123456 登录（首登/强制改密用 session 真实登录） */
   adminSession: () => Promise<TestSession>;
   /** 直接插入一个对外 token 行，返回明文（绕过 API，供 /data Bearer 鉴权测试） */
   insertToken: (
@@ -132,6 +132,7 @@ export async function setupTest(): Promise<TestSetup> {
   const session = () => api.test.session();
 
   const adminSession = async () => {
+    await systemDb.db.updateTable('admin').set({ must_change_password: 0 }).where('name', '=', 'admin').execute();
     const s = session();
     await s.post('/auth/login').input({ name: 'admin', password: '123456' }).success();
     return s;

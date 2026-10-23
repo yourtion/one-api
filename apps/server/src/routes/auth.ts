@@ -49,7 +49,7 @@ export function registerAuthRoutes(api: AppApi): void {
     },
   );
 
-  auth.get('/me').title('当前管理员').before(requireAdmin(getSystemDb())).registerTyped({}, async (_req, ctx) => {
+  auth.get('/me').title('当前管理员').before(requireAdmin(getSystemDb(), { allowPasswordChangeRequired: true })).registerTyped({}, async (_req, ctx) => {
     const user = ctx.state.currentUser;
     if (!user) throw Errors.unauthorized();
     const admin = await store.findById(user.id);
@@ -57,20 +57,21 @@ export function registerAuthRoutes(api: AppApi): void {
     return toAdminVO(admin);
   });
 
-  auth.put('/password').title('修改密码').before(requireAdmin(getSystemDb())).registerTyped(
+  auth.put('/password').title('修改密码').before(requireAdmin(getSystemDb(), { allowPasswordChangeRequired: true })).registerTyped(
     { body: z.object({ oldPassword: z.string(), newPassword: z.string().min(6) }) },
     async (req, ctx) => {
       const user = ctx.state.currentUser;
       if (!user) throw Errors.unauthorized();
       const admin = await store.findById(user.id);
       if (!admin || !comparePassword(req.body.oldPassword, admin.password_hash)) throw Errors.authInvalidCredentials();
+      if (comparePassword(req.body.newPassword, admin.password_hash)) throw Errors.validationFail('新密码不能与旧密码相同');
       await store.updatePassword(admin.id, hashPassword(req.body.newPassword));
       await store.setMustChangePassword(admin.id, 0);
       return { success: true };
     },
   );
 
-  auth.post('/logout').title('登出').before(requireAdmin(getSystemDb())).registerTyped({}, async (_req, ctx) => {
+  auth.post('/logout').title('登出').before(requireAdmin(getSystemDb(), { allowPasswordChangeRequired: true })).registerTyped({}, async (_req, ctx) => {
     // 销毁 session 存储 + 清除客户端 cookie，凭证立即失效
     await ctx.reply.raw.session.destroy();
     ctx.reply.raw.response.clearCookie(SESSION_NAME);

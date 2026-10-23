@@ -49,11 +49,16 @@ export function requireToken(systemDb: Kysely<ServerSystemDB>): Middleware {
  * admin 通道鉴权：读 @leizm/web session（cookie 载体），校验 session.data.adminId，
  * 据此查询 admin 行注入 ctx.state.currentUser。
  * 失败抛 UNAUTHORIZED（未登录 / session 已销毁 / admin 已不存在）。
+ * 默认拒绝待改密账号（403 AUTH_PASSWORD_CHANGE_REQUIRED）；仅改密相关 auth 接口显式放行。
+ * 每次请求读取当前标记，因此重置密码后已有 session 也立即受限。
  *
  * 与对外 requireToken（Bearer）解耦：admin 通道不再依赖 api_token 表，
  * login 经 @leizm/web session 建立会话，logout 销毁 session。
  */
-export function requireAdmin(systemDb: Kysely<ServerSystemDB>): Middleware {
+export function requireAdmin(
+  systemDb: Kysely<ServerSystemDB>,
+  options?: { allowPasswordChangeRequired?: boolean },
+): Middleware {
   const store = createAdminStore(systemDb);
   return async (ctx, next) => {
     // ctx.reply.raw 是框架无关的 unknown；admin 通道仅在生产 @leizm/web 下挂载，
@@ -63,6 +68,9 @@ export function requireAdmin(systemDb: Kysely<ServerSystemDB>): Middleware {
     if (typeof adminId !== 'number') throw Errors.unauthorized();
     const admin = await store.findById(adminId);
     if (!admin) throw Errors.unauthorized();
+    if (admin.must_change_password === 1 && !options?.allowPasswordChangeRequired) {
+      throw Errors.authPasswordChangeRequired();
+    }
     ctx.state.currentUser = {
       id: admin.id,
       name: admin.name,

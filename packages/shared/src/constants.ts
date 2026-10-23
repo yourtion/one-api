@@ -63,6 +63,7 @@ export const ErrorCode = {
   INVALID_TOKEN: 'INVALID_TOKEN',
   FORBIDDEN: 'FORBIDDEN',
   UNAUTHORIZED: 'UNAUTHORIZED',
+  AUTH_PASSWORD_CHANGE_REQUIRED: 'AUTH_PASSWORD_CHANGE_REQUIRED',
 } as const;
 
 export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode];
