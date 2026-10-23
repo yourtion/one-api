@@ -17,9 +17,9 @@ describe('initSystemDb', () => {
     const path = join(dir, 'system.db');
     const { raw, close } = await initSystemDb(path);
 
-    const tables = raw
-      .prepare("SELECT name FROM sqlite_master WHERE type='table'")
-      .all() as { name: string }[];
+    const tables = raw.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as {
+      name: string;
+    }[];
     const names = tables.map((t) => t.name);
     expect(names).toContain('admin');
     expect(names).toContain('api_token');
@@ -47,7 +47,6 @@ describe('initSystemDb', () => {
   });
 });
 
-
 describe('系统库工厂失败清理', () => {
   it('已有库的 DDL/初始化失败时关闭尚未返回的 SQLite 句柄', async () => {
     dir = mkdtempSync(join(tmpdir(), '1api-sys-failed-'));
@@ -59,5 +58,20 @@ describe('系统库工厂失败清理', () => {
     await expect(initSystemDb(path)).rejects.toThrow(/nickname/);
     expect(close).toHaveBeenCalledTimes(1);
     expect(close.mock.contexts[0]!.open).toBe(false);
+  });
+});
+
+describe('系统库关闭失败清理', () => {
+  it('destroy 拒绝仍关闭原生句柄，保留首个异常', async () => {
+    dir = mkdtempSync(join(tmpdir(), '1api-sys-close-'));
+    const handle = await initSystemDb(join(dir, 'system.db'));
+    const failure = new Error('destroy failed');
+    vi.spyOn(handle.db, 'destroy').mockRejectedValue(failure);
+    try {
+      await expect(handle.close()).rejects.toBe(failure);
+      expect(handle.raw.open).toBe(false);
+    } finally {
+      if (handle.raw.open) handle.raw.close();
+    }
   });
 });

@@ -104,13 +104,26 @@ export async function setupTest(): Promise<TestSetup> {
     if (!ctx.response.headersSent) {
       ctx.response.status(e.statusCode ?? 500).json({
         success: false,
-        error: { code: e.code ?? 'INTERNAL_ERROR', message: isKnown ? e.message : '服务器内部错误' },
+        error: {
+          code: e.code ?? 'INTERNAL_ERROR',
+          message: isKnown ? e.message : '服务器内部错误',
+        },
       });
     }
   });
 
   // initTest 接受 leizm/web 的 app.server（http.Server），归一化为随机端口
-  api.initTest(app.server);
+  // erest 3.2.1 的 initTest 同步调用 genDocs() 并默认 saveOnExit；测试夹具不应
+  // 在进程退出时写文档。只移除本次同步初始化新增的精确 listener，保留已有监听器。
+  // 文档生成脚本仍可显式 api.genDocs(dir, false) 保存同一 docs 实例。
+  const exitListeners = new Set(process.listeners('exit'));
+  try {
+    api.initTest(app.server);
+  } finally {
+    for (const listener of process.listeners('exit')) {
+      if (!exitListeners.has(listener)) process.removeListener('exit', listener);
+    }
+  }
 
   // erest 的 initTest 是**延迟 listen**：只有首次 erest 测试请求时才调 server.listen(0)。
   // erest 自身的 test.session() 在 fetch 前 await ready() 门控，所以 erest 测试不受影响；
@@ -132,7 +145,11 @@ export async function setupTest(): Promise<TestSetup> {
   const session = () => api.test.session();
 
   const adminSession = async () => {
-    await systemDb.db.updateTable('admin').set({ must_change_password: 0 }).where('name', '=', 'admin').execute();
+    await systemDb.db
+      .updateTable('admin')
+      .set({ must_change_password: 0 })
+      .where('name', '=', 'admin')
+      .execute();
     const s = session();
     await s.post('/auth/login').input({ name: 'admin', password: '123456' }).success();
     return s;
@@ -175,10 +192,25 @@ export async function setupTest(): Promise<TestSetup> {
     return { plain: r.plain, id: r.id };
   };
 
-  const cleanup = async () => {
-    await engine.destroy();
-    await systemDb.close();
-    rmSync(dir, { recursive: true, force: true });
+  let cleanupPromise: Promise<void> | undefined;
+  const cleanup = () => {
+    cleanupPromise ??= (async () => {
+      // 强制断开 keep-alive/测试客户端连接，避免 server.close 无界等待。
+      await new Promise<void>((resolve, reject) => {
+        app.server.close((error) => (error ? reject(error) : resolve()));
+        app.server.closeAllConnections();
+      });
+      try {
+        await engine.destroy();
+      } finally {
+        try {
+          await systemDb.close();
+        } finally {
+          rmSync(dir, { recursive: true, force: true });
+        }
+      }
+    })();
+    return cleanupPromise;
   };
 
   return {

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 // 跨包 import server 的测试夹具（dev 依赖，仅测试用）；alias 映射 @1api/server → apps/server/src。
 // 注意：测试夹具 setupTest() 在 leizm/web app 根路径 bind erest（与生产 /api 子挂载不同），
 // 故 data 组路由实际暴露在 /data/*（非 /api/data/*）。
@@ -27,7 +27,7 @@ beforeEach(async () => {
   });
 });
 
-afterAll(async () => {
+afterEach(async () => {
   await t.cleanup();
 });
 
@@ -53,16 +53,22 @@ describe('SDK 集成（真实 server）', () => {
       {},
     ]) {
       await expect(c.create('validated', payload)).rejects.toMatchObject({
-        code: 'VALIDATION_FAIL', statusCode: 400,
+        code: 'VALIDATION_FAIL',
+        statusCode: 400,
       });
     }
     expect((await c.list('validated')).total).toBe(0);
     const row = await c.create('validated', { amount: '42', enabled: 'false' });
     expect(row).toMatchObject({ amount: 42, enabled: false });
     await expect(c.update('validated', row.id, { state: 'invalid' })).rejects.toMatchObject({
-      code: 'VALIDATION_FAIL', statusCode: 400,
+      code: 'VALIDATION_FAIL',
+      statusCode: 400,
     });
-    expect(await c.get('validated', row.id)).toMatchObject({ amount: 42, state: 'draft', enabled: false });
+    expect(await c.get('validated', row.id)).toMatchObject({
+      amount: 42,
+      state: 'draft',
+      enabled: false,
+    });
   });
 
   it('完整 CRUD 流程', async () => {
@@ -139,7 +145,10 @@ describe('SDK 集成（真实 server）', () => {
 
   it('无效 token → 抛 INVALID_TOKEN', async () => {
     const c = createClient(baseUrl, 'oa_invalid_xxx');
-    await expect(c.describe('posts')).rejects.toMatchObject({ code: 'INVALID_TOKEN', statusCode: 401 });
+    await expect(c.describe('posts')).rejects.toMatchObject({
+      code: 'INVALID_TOKEN',
+      statusCode: 401,
+    });
   });
 
   it('schema.createTable / addField（schema 权限）', async () => {
@@ -151,7 +160,11 @@ describe('SDK 集成（真实 server）', () => {
       fields: [{ name: 'id', jsonType: 'integer', isPrimary: true, nullable: false }],
     });
     expect(meta.name).toBe('items');
-    const after = await c.schema.addField('items', { name: 'n', jsonType: 'string', nullable: true });
+    const after = await c.schema.addField('items', {
+      name: 'n',
+      jsonType: 'string',
+      nullable: true,
+    });
     expect(after.fields.map((f) => f.name)).toContain('n');
   });
 });

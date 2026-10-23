@@ -44,7 +44,16 @@ export async function initSystemDb(
       raw,
       db,
       close: async () => {
-        await db.destroy();
+        try {
+          await db.destroy();
+        } catch (error) {
+          try {
+            if (raw.open) raw.close();
+          } catch {
+            // 保留最初的 destroy 异常。
+          }
+          throw error;
+        }
         if (raw.open) raw.close();
       },
     };
