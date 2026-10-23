@@ -50,17 +50,22 @@ const editSchema = computed(() =>
   meta.value ? fieldsToEditorSchema(meta.value.fields) : { type: 'object' as const, properties: {}, required: [] },
 );
 
+function currentQuery(): Record<string, unknown> {
+  const query: Record<string, unknown> = {};
+  if (order.value) query['order'] = order.value;
+  if (q.value) query['q'] = q.value;
+  // 字段精确过滤：field__eq=value
+  for (const [k, v] of Object.entries(filters.value)) {
+    if (v) query[`${k}__eq`] = v;
+  }
+  return query;
+}
+
 async function load() {
   loading.value = true;
   try {
     if (!meta.value) meta.value = await getTable(id());
-    const query: Record<string, unknown> = { page: page.value, size: size.value };
-    if (order.value) query['order'] = order.value;
-    if (q.value) query['q'] = q.value;
-    // 字段精确过滤：field__eq=value
-    for (const [k, v] of Object.entries(filters.value)) {
-      if (v) query[`${k}__eq`] = v;
-    }
+    const query = { ...currentQuery(), page: page.value, size: size.value };
     const res = await listData<Record<string, unknown>>(id(), query);
     rows.value = res.rows;
     total.value = res.total;
@@ -114,7 +119,7 @@ async function onDelete(row: Record<string, unknown>) {
 
 async function onExport() {
   try {
-    const { blob, truncated, total: t } = await exportCsv(id(), { page: 1, size: 10000 });
+    const { blob, truncated, total: t } = await exportCsv(id(), currentQuery());
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
