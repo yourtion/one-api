@@ -32,6 +32,39 @@ afterAll(async () => {
 });
 
 describe('SDK 集成（真实 server）', () => {
+  it('引擎无效写入通过真实 HTTP 返回 VALIDATION_FAIL，记录保持不变', async () => {
+    const token = await t.insertToken({ tables: ['*'], actions: ['read', 'write', 'schema'] });
+    const c = createClient(baseUrl, token);
+    await c.schema.createTable({
+      name: 'validated',
+      label: 'validated',
+      fields: [
+        { name: 'amount', jsonType: 'integer', nullable: false },
+        { name: 'state', jsonType: 'string', enumValues: ['draft', 'done'], defaultValue: 'draft' },
+        { name: 'enabled', jsonType: 'boolean', defaultValue: false },
+      ],
+    });
+    for (const payload of [
+      { amount: 'invalid' },
+      { amount: 1, state: 'invalid' },
+      { amount: 1, enabled: 'yes' },
+      { amount: null },
+      { amount: 1, unknown: 1 },
+      {},
+    ]) {
+      await expect(c.create('validated', payload)).rejects.toMatchObject({
+        code: 'VALIDATION_FAIL', statusCode: 400,
+      });
+    }
+    expect((await c.list('validated')).total).toBe(0);
+    const row = await c.create('validated', { amount: '42', enabled: 'false' });
+    expect(row).toMatchObject({ amount: 42, enabled: false });
+    await expect(c.update('validated', row.id, { state: 'invalid' })).rejects.toMatchObject({
+      code: 'VALIDATION_FAIL', statusCode: 400,
+    });
+    expect(await c.get('validated', row.id)).toMatchObject({ amount: 42, state: 'draft', enabled: false });
+  });
+
   it('完整 CRUD 流程', async () => {
     const token = await t.insertToken({ tables: ['*'], actions: ['read', 'write'] });
     const c = createClient(baseUrl, token);

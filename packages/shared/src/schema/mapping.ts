@@ -72,7 +72,7 @@ export function fieldsToJsonSchema(fields: FieldMeta[]): Record<string, unknown>
   return { type: 'object', properties, required };
 }
 
-/** 单字段 → Zod schema（供 node-erest 校验） */
+/** 单字段 → Zod schema（引擎写入与各消费端共用） */
 export function fieldToZod(f: FieldMeta): z.ZodType {
   let s: z.ZodType;
   switch (f.jsonType) {

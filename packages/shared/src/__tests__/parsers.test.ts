@@ -45,3 +45,27 @@ describe('coerceNum', () => {
     expect(() => coerceNum.parse('abc')).toThrow();
   });
 });
+
+describe('转换失败统一为 Zod 校验失败', () => {
+  it.each(['yes', 'no', '', 'maybe', 2, null, [], {}])('布尔值 %j 不抛普通 Error', (value) => {
+    expect(coerceBool.safeParse(value).success).toBe(false);
+  });
+
+  for (const [name, parser] of [
+    ['integer', coerceInt],
+    ['number', coerceNum],
+  ] as const) {
+    it.each([null, undefined, '', '   ', true, false, [], [1], {}, NaN, Infinity, -Infinity, 'Infinity'])(
+      `${name} 拒绝非数值输入 %j`,
+      (value) => {
+        expect(parser.safeParse(value).success).toBe(false);
+      },
+    );
+    it(`${name} 接受有限数字和非空数字字符串`, () => {
+      expect(parser.parse(42)).toBe(42);
+      expect(parser.parse('42')).toBe(42);
+      expect(parser.parse(' -12 ')).toBe(-12);
+      expect(parser.parse('0')).toBe(0);
+    });
+  }
+});
