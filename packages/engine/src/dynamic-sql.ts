@@ -159,12 +159,14 @@ export class DynamicSql {
       cols.length === 0
         ? sql`INSERT INTO ${sql.id(meta.name)} DEFAULT VALUES`
         : sql`INSERT INTO ${sql.id(meta.name)} (${colNodes}) VALUES (${valNodes})`;
-    const res = await sql<Row>`${insert} RETURNING ${col(meta.primaryKey)}`.execute(this.businessDb);
-    const inserted = res.rows[0];
-    if (inserted && inserted[meta.primaryKey] !== undefined) return inserted[meta.primaryKey];
-    // 兜底：last_insert_rowid()
-    const r = await sql<{ id: number }>`SELECT last_insert_rowid() AS id`.execute(this.businessDb);
-    return r.rows[0]?.id;
+    return this.businessDb.transaction().execute(async (trx) => {
+      const res = await sql<Row>`${insert} RETURNING ${col(meta.primaryKey)}`.execute(trx);
+      const pk = res.rows[0]?.[meta.primaryKey];
+      if (pk === null || pk === undefined) {
+        throw Errors.validationFail(`字段 ${meta.primaryKey} 未生成有效主键`);
+      }
+      return pk;
+    });
   }
 
   async updateRow(meta: TableMeta, pk: unknown, patch: Record<string, unknown>): Promise<void> {

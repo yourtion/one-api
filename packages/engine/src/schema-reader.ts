@@ -96,7 +96,11 @@ export function readTableSchema(
 function parseDefaultValue(raw: string | null, jsonType: JsonType): unknown {
   if (raw === null) return null;
   const v = raw.trim();
-  if (/^NULL$/i.test(v)) return null;
+  let literal = v;
+  while (literal.startsWith('(') && literal.endsWith(')')) {
+    literal = literal.slice(1, -1).trim();
+  }
+  if (/^NULL$/i.test(literal)) return null;
   if (jsonType === 'boolean') return v === '1' ? true : v === '0' ? false : raw;
   if (jsonType === 'integer' || jsonType === 'number') {
     const n = Number(v);

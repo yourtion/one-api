@@ -83,6 +83,7 @@ describe('schema-reader', () => {
         int_null INTEGER DEFAULT NULL,
         real_null REAL DEFAULT NULL,
         text_null TEXT DEFAULT NULL,
+        wrapped_null TEXT DEFAULT (((NULL))),
         expr_amount INTEGER DEFAULT (abs(-5)),
         expr_price REAL DEFAULT (1.5 + 2.5),
         expr_integer INTEGER DEFAULT (1 + 2)
@@ -101,6 +102,7 @@ describe('schema-reader', () => {
         int_null: null,
         real_null: null,
         text_null: null,
+        wrapped_null: null,
         expr_amount: 'abs(-5)',
         expr_price: '1.5 + 2.5',
         expr_integer: '1 + 2',

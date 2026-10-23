@@ -211,6 +211,63 @@ describe('DataService 写入校验（真实 SQLite）', () => {
     expect((await data.list('null_default')).total).toBe(0);
   });
 
+  it.each(['((NULL))', '((( null )))'])('括号 NULL 默认值 %s 仍要求提供非空文本主键', async (defaultSql) => {
+    dbs.businessRaw.exec(`CREATE TABLE null_keys (id TEXT PRIMARY KEY DEFAULT ${defaultSql})`);
+    const meta = await schema.importExisting('null_keys');
+    expect(meta.fields[0]?.defaultValue).toBeNull();
+    await expect(data.create('null_keys', {})).rejects.toMatchObject({
+      code: 'VALIDATION_FAIL', message: expect.stringContaining('id'),
+    });
+    expect((await data.list('null_keys')).total).toBe(0);
+  });
+
+  it.each(['INTEGER', 'REAL', 'TEXT'])('NOT NULL 的 %s 字段不能省略括号 NULL 默认值', async (type) => {
+    dbs.businessRaw.exec(`CREATE TABLE null_columns (id INTEGER PRIMARY KEY, value ${type} NOT NULL DEFAULT (((NULL))))`);
+    const meta = await schema.importExisting('null_columns');
+    expect(meta.fields.find((field) => field.name === 'value')?.defaultValue).toBeNull();
+    await expect(data.create('null_columns', {})).rejects.toMatchObject({
+      code: 'VALIDATION_FAIL', message: expect.stringContaining('value'),
+    });
+    expect((await data.list('null_columns')).total).toBe(0);
+  });
+
+  it('默认表达式生成 null 主键时拒绝并回滚插入及触发器，已有行保留', async () => {
+    dbs.businessRaw.exec(`
+      CREATE TABLE null_expression_keys (id TEXT PRIMARY KEY DEFAULT (lower(NULL)));
+      INSERT INTO null_expression_keys (id) VALUES ('existing');
+      CREATE TABLE insert_audit (id INTEGER PRIMARY KEY, item_id TEXT);
+      CREATE TRIGGER audit_null_keys AFTER INSERT ON null_expression_keys BEGIN
+        INSERT INTO insert_audit (item_id) VALUES (NEW.id);
+      END;
+    `);
+    await schema.importExisting('null_expression_keys');
+    await expect(data.create('null_expression_keys', {})).rejects.toMatchObject({
+      code: 'VALIDATION_FAIL', message: expect.stringContaining('id'),
+    });
+    expect((await data.list('null_expression_keys')).rows).toEqual([{ id: 'existing' }]);
+    expect(dbs.businessRaw.prepare('SELECT * FROM insert_audit').all()).toEqual([]);
+    expect(await data.create('null_expression_keys', { id: 'valid' })).toEqual({ id: 'valid' });
+    expect(dbs.businessRaw.prepare('SELECT item_id FROM insert_audit').all()).toEqual([{ item_id: 'valid' }]);
+  });
+
+  it('INSERT 未返回主键时回滚，不用 last_insert_rowid 返回上一行', async () => {
+    dbs.businessRaw.exec(`
+      CREATE TABLE ignored_keys (id INTEGER PRIMARY KEY, value TEXT);
+      INSERT INTO ignored_keys (id, value) VALUES (1, 'existing');
+      CREATE TABLE ignored_audit (id INTEGER PRIMARY KEY);
+      CREATE TRIGGER ignore_insert BEFORE INSERT ON ignored_keys BEGIN
+        INSERT INTO ignored_audit (id) VALUES (NULL);
+        SELECT RAISE(IGNORE);
+      END;
+    `);
+    await schema.importExisting('ignored_keys');
+    await expect(data.create('ignored_keys', { value: 'new' })).rejects.toMatchObject({
+      code: 'VALIDATION_FAIL', message: expect.stringContaining('id'),
+    });
+    expect((await data.list('ignored_keys')).rows).toEqual([{ id: 1, value: 'existing' }]);
+    expect(dbs.businessRaw.prepare('SELECT * FROM ignored_audit').all()).toEqual([]);
+  });
+
   it('BLOB 输入返回字段校验错误', async () => {
     dbs.businessRaw.exec('CREATE TABLE blobs (id INTEGER PRIMARY KEY, payload BLOB)');
     await schema.importExisting('blobs');
