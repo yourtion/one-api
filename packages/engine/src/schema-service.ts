@@ -3,6 +3,7 @@ import { Errors, isReservedName, isValidName, type FieldMetaInput, type TableMet
 import { addColumn, createTable, inputToField } from './schema-ddl.js';
 import { listTables, readTableSchema } from './schema-reader.js';
 import { MetadataStore } from './metadata.js';
+import { mergeFieldMetadata } from './field-metadata.js';
 
 export class SchemaService {
   constructor(
@@ -29,6 +30,7 @@ export class SchemaService {
     autoTimestamps?: boolean;
   }): Promise<TableMeta> {
     this.assertCreatableName(opts.name);
+    for (const field of opts.fields) this.assertCreatableName(field.name);
     if (await this.store.getMetaByName(opts.name)) throw Errors.tableAlreadyExists(opts.name);
     if (listTables(this.businessRaw).includes(opts.name)) {
       throw Errors.tableAlreadyExists(opts.name);
@@ -41,7 +43,7 @@ export class SchemaService {
       name: opts.name,
       label: opts.label,
       primaryKey,
-      fields,
+      fields: mergeFieldMetadata(fields, opts.fields),
     };
     if (opts.note !== undefined) createInput.note = opts.note;
     return this.store.createMeta(createInput);
@@ -56,7 +58,7 @@ export class SchemaService {
       throw Errors.validationFail(`字段已存在: ${field.name}`);
     }
     addColumn(this.businessRaw, table, inputToField(field));
-    return this.store.refreshMeta(meta.id);
+    return this.store.refreshMeta(meta.id, [field]);
   }
 
   /** 刷新元数据（重新反射 + diff） */

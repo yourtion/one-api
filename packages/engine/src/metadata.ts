@@ -1,7 +1,8 @@
 import type Database from 'better-sqlite3';
 import { type Kysely } from 'kysely';
-import { type FieldMeta, type TableMeta } from '@1api/shared';
+import { type FieldMeta, type FieldMetaInput, type TableMeta } from '@1api/shared';
 import { readTableSchema } from './schema-reader.js';
+import { mergeFieldMetadata } from './field-metadata.js';
 import type { SystemDB } from './system-db.js';
 
 export interface CreateMetaInput {
@@ -128,28 +129,13 @@ export class MetadataStore {
     if (meta) this.cache.delete(meta.name);
   }
 
-  /** 重新反射业务库 → diff → 保留用户标记（label/isHidden/isReadonly/enumValues）→ 更新 fields */
-  async refreshMeta(id: number): Promise<TableMeta> {
+  /** 重新反射业务库，合并兼容的逻辑类型、用户标记及新增字段的建模输入。 */
+  async refreshMeta(id: number, addedFields: FieldMetaInput[] = []): Promise<TableMeta> {
     const current = await this.getMeta(id);
     if (!current) throw new Error(`meta ${id} not found`);
     const { fields: reflected, primaryKey } = readTableSchema(this.businessRaw, current.name);
 
-    // 按 name 索引旧字段，保留用户标记
-    const oldByName = new Map(current.fields.map((fld) => [fld.name, fld]));
-    const merged: FieldMeta[] = reflected.map((rf) => {
-      const old = oldByName.get(rf.name);
-      if (!old) return rf; // 新字段：纯反射结果（label 默认 = name）
-      // 保留用户标记，结构用反射最新值
-      const mergedField: FieldMeta = {
-        ...rf,
-        label: old.label,
-        isHidden: old.isHidden,
-        isReadonly: old.isReadonly,
-      };
-      // exactOptionalPropertyTypes：仅在显式提供时挂载 enumValues
-      if (old.enumValues !== undefined) mergedField.enumValues = old.enumValues;
-      return mergedField;
-    });
+    const merged = mergeFieldMetadata(reflected, [...current.fields, ...addedFields]);
 
     await this.updateMeta(id, { fields: merged, primaryKey });
     const after = await this.getMeta(id);
