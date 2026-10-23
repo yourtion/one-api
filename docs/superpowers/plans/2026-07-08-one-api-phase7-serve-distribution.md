@@ -1,5 +1,9 @@
 # Phase 7 · 一键启动分发（@1api/serve）实现计划
 
+> 当前状态（2026-10-24）：Phase 7 代码已实现；七个包的 `0.1.0` 均已在 npm 注册表。当前统一准备 `0.1.1` 修复版，本次仅代码和打包验收，不执行 npm 发布。
+> 本文保留 2026-07-08 历史设计与步骤；其中初始 `0.1.0` 版本号、未发布描述及勾选框不表示当前状态。收尾范围与验收以 [稳定性修复 spec](../specs/2026-10-23-reliability-and-phase7-completion.md) 和 [执行计划](../plans/2026-10-23-reliability-and-phase7-completion.md) 为准。
+> 当前契约：健康检查 `/healthz`；web 独立输出 `apps/web/dist`；engine/server/serve/CLI 要求 Node.js `^22.13.0 || >=24`。每个 app 独立路由与 session，但同一进程仅一个活动服务；第二次 listen 在建库前拒绝，close 幂等并等待启动，关闭后新句柄可重新启动，信号由 bin 处理。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 让终端用户通过 `npx @1api/serve`（命令名 `1api`）一键启动带可选 web 管理界面的完整 one-api 服务。
@@ -18,7 +22,7 @@
 - **`exactOptionalPropertyTypes`**：构造含可选字段的对象必须条件挂载（`if (x !== undefined) obj.opt = x`），不能 `foo: input.foo`。
 - **`noUncheckedIndexedAccess`**：`arr[i]`/`obj[k]` 类型含 `undefined`，访问需判空。
 - **`verbatimModuleSyntax`**：纯类型导入用 `import type`。
-- **模块单例**：`engineInstance`（`core/engine.ts`）/`systemDbInstance`（`core/system-db.ts`）是全局单例，erest `api`（`api/instance.ts`）也是。多次调 `buildApp()` 会重复注册路由抛错——`createServer` 内部每个实例只 buildApp 一次，测试用例隔离靠独立进程或 `_resetEngine()`。
+- **生命周期（当前）**：数据库句柄仍为进程单例；`buildApp()` 已改为每 app 独立 erest 与 session store。`createServer().listen()` 拒绝并发活动实例，`close()` 清理后可用新句柄启动。
 - **覆盖率门槛**：core 逻辑行 >90%、分支 >85%。
 
 ---
@@ -1312,7 +1316,7 @@ git commit -m "feat: 根 release 脚本（pnpm -r build+typecheck+test+publish�
 
 ---
 
-## Task 12：执行 npm 发布
+## Task 12：执行 npm 发布（历史步骤，本次不执行）
 
 **Files:** 无（纯操作）
 
@@ -1344,7 +1348,7 @@ pnpm release
 ```
 Expected: 7 个包（含已发的 shared/engine/sdk/cli 若需 bump）发布成功，输出各包 URL
 
-> 若 shared/engine/sdk/cli 无改动，`pnpm -r publish` 会跳过（npm 报「已存在该版本」），不影响新包发布。
+> 当前发布准备：七包统一 0.1.1，先运行 `pnpm quality` 与 `pnpm release:preflight`；注册表已有版本不能覆盖。下列 0.1.0 发布命令为历史记录，本次不执行。
 
 - [ ] **Step 4：验证发布成功**
 
