@@ -109,7 +109,7 @@ export class DynamicSql {
       const qFields = meta.fields.filter((f) => f.sqliteType === 'TEXT' && !f.isPrimary);
       if (qFields.length > 0) {
         const likes = qFields.map((f) => sql`${col(f.name)} LIKE ${'%' + opts.q + '%'}`);
-        whereParts.push(sql.join(likes, sql.raw(' OR ')));
+        whereParts.push(sql`(${sql.join(likes, sql.raw(' OR '))})`);
       }
     }
 
