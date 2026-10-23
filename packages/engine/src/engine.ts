@@ -57,11 +57,27 @@ export async function createEngine(
     const engine = new DataEngine(businessRaw, businessDb, systemDb);
     await engine.metadata.warmup(); // 缓存预热
 
+    let destroyPromise: Promise<void> | undefined;
     return Object.assign(engine, {
-      async destroy() {
-        const results = await Promise.allSettled([businessDb.destroy(), systemDb.destroy()]);
-        const failure = results.find((result) => result.status === 'rejected');
-        if (failure?.status === 'rejected') throw failure.reason;
+      destroy() {
+        destroyPromise ??= (async () => {
+          const failures: unknown[] = [];
+          const results = await Promise.allSettled([
+            Promise.resolve().then(() => businessDb.destroy()),
+            Promise.resolve().then(() => systemDb.destroy()),
+          ]);
+          for (const result of results) if (result.status === 'rejected') failures.push(result.reason);
+          // Kysely 未执行过查询时不会初始化 driver，destroy 也不会关闭传入的原生句柄。
+          for (const raw of [businessRaw, systemRaw]) {
+            try {
+              if (raw?.open) raw.close();
+            } catch (error) {
+              failures.push(error);
+            }
+          }
+          if (failures.length) throw failures[0];
+        })();
+        return destroyPromise;
       },
     });
   } catch (error) {
