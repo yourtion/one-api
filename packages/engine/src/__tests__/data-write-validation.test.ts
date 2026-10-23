@@ -173,6 +173,44 @@ describe('DataService 写入校验（真实 SQLite）', () => {
     expect(row.updated_at).toBe(row.created_at);
   });
 
+  it('导入表的数值 SQL 默认表达式由 SQLite 计算，省略字段可创建', async () => {
+    dbs.businessRaw.exec(`CREATE TABLE imported_defaults (
+      id INTEGER PRIMARY KEY,
+      amount INTEGER NOT NULL DEFAULT (abs(-5)),
+      price REAL NOT NULL DEFAULT (1.5 + 2.5)
+    )`);
+    await schema.importExisting('imported_defaults');
+    expect(await data.create('imported_defaults', {})).toEqual({ id: 1, amount: 5, price: 4 });
+  });
+
+  it('非自增主键的 SQL 默认表达式生成可回查的主键，显式 null 仍拒绝', async () => {
+    dbs.businessRaw.exec(`CREATE TABLE generated_keys (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16))))
+    )`);
+    const meta = await schema.importExisting('generated_keys');
+    expect(meta.fields[0]).toMatchObject({ isPrimary: true, isAutoIncrement: false, nullable: true });
+    const first = await data.create('generated_keys', {});
+    const second = await data.create('generated_keys', {});
+    expect(first.id).toMatch(/^[a-f0-9]{32}$/);
+    expect(second.id).toMatch(/^[a-f0-9]{32}$/);
+    expect(first.id).not.toBe(second.id);
+    expect(await data.get('generated_keys', first.id)).toEqual(first);
+    await expect(data.create('generated_keys', { id: null })).rejects.toMatchObject({
+      code: 'VALIDATION_FAIL', message: expect.stringContaining('id'),
+    });
+    expect((await data.list('generated_keys')).total).toBe(2);
+  });
+
+  it.each(['INTEGER', 'REAL', 'TEXT'])('NOT NULL DEFAULT NULL 的 %s 字段仍须显式提供值', async (type) => {
+    dbs.businessRaw.exec(`CREATE TABLE null_default (id INTEGER PRIMARY KEY, value ${type} NOT NULL DEFAULT NULL)`);
+    const meta = await schema.importExisting('null_default');
+    expect(meta.fields.find((field) => field.name === 'value')?.defaultValue).toBeNull();
+    await expect(data.create('null_default', {})).rejects.toMatchObject({
+      code: 'VALIDATION_FAIL', message: expect.stringContaining('value'),
+    });
+    expect((await data.list('null_default')).total).toBe(0);
+  });
+
   it('BLOB 输入返回字段校验错误', async () => {
     dbs.businessRaw.exec('CREATE TABLE blobs (id INTEGER PRIMARY KEY, payload BLOB)');
     await schema.importExisting('blobs');

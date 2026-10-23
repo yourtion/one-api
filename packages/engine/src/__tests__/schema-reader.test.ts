@@ -69,6 +69,44 @@ describe('schema-reader', () => {
       expect(note.nullable).toBe(true);
     });
 
+    it('默认值解析完整字面量，未求值 SQL 表达式保留原文，NULL 保持 null', () => {
+      exec(`CREATE TABLE defaults (
+        id INTEGER PRIMARY KEY,
+        amount INTEGER DEFAULT -5,
+        price REAL DEFAULT 1.5,
+        exponent NUMERIC DEFAULT 1e2,
+        label TEXT DEFAULT 'O''Brien',
+        string_null TEXT DEFAULT 'NULL',
+        expr_string TEXT DEFAULT ('a' || 'b'),
+        is_active INTEGER DEFAULT 1,
+        has_pet INTEGER DEFAULT 0,
+        int_null INTEGER DEFAULT NULL,
+        real_null REAL DEFAULT NULL,
+        text_null TEXT DEFAULT NULL,
+        expr_amount INTEGER DEFAULT (abs(-5)),
+        expr_price REAL DEFAULT (1.5 + 2.5),
+        expr_integer INTEGER DEFAULT (1 + 2)
+      )`);
+      const { fields } = readTableSchema(dbs.businessRaw, 'defaults');
+      const defaults = Object.fromEntries(fields.map((field) => [field.name, field.defaultValue]));
+      expect(defaults).toMatchObject({
+        amount: -5,
+        price: 1.5,
+        exponent: 100,
+        label: "O'Brien",
+        string_null: 'NULL',
+        expr_string: "'a' || 'b'",
+        is_active: true,
+        has_pet: false,
+        int_null: null,
+        real_null: null,
+        text_null: null,
+        expr_amount: 'abs(-5)',
+        expr_price: '1.5 + 2.5',
+        expr_integer: '1 + 2',
+      });
+    });
+
     it('created_at/updated_at 默认标记 isReadonly', () => {
       exec('CREATE TABLE t (id INTEGER PRIMARY KEY, created_at TEXT, updated_at TEXT, name TEXT)');
       const { fields } = readTableSchema(dbs.businessRaw, 't');

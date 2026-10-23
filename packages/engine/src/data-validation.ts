@@ -29,7 +29,7 @@ export function validateWriteData(meta: TableMeta, input: Row, mode: 'create' | 
   if (mode === 'create') {
     for (const field of meta.fields) {
       const hasDefault = field.defaultValue !== null && field.defaultValue !== undefined;
-      const required = field.isPrimary || (!field.nullable && !hasDefault);
+      const required = !hasDefault && (field.isPrimary || !field.nullable);
       if (
         required &&
         !field.isAutoIncrement &&
