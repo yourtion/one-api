@@ -39,26 +39,43 @@ export async function createEngine(
   ensureDbDir(opts.businessDbPath);
   ensureDbDir(opts.systemDbPath);
   const businessRaw = new Database(opts.businessDbPath);
-  businessRaw.pragma('journal_mode = WAL');
-  const systemRaw = new Database(opts.systemDbPath);
+  let systemRaw: Database.Database | undefined;
+  try {
+    businessRaw.pragma('journal_mode = WAL');
+    systemRaw = new Database(opts.systemDbPath);
 
-  // 系统库迁移（Phase 1 仅 table_meta）
-  for (const m of SYSTEM_DB_MIGRATIONS) systemRaw.exec(m);
+    // 系统库迁移（Phase 1 仅 table_meta）
+    for (const m of SYSTEM_DB_MIGRATIONS) systemRaw.exec(m);
 
-  const businessDb = new Kysely<Record<string, never>>({
-    dialect: new SqliteDialect({ database: businessRaw }),
-  });
-  const systemDb = new Kysely<SystemDB>({
-    dialect: new SqliteDialect({ database: systemRaw }),
-  });
+    const businessDb = new Kysely<Record<string, never>>({
+      dialect: new SqliteDialect({ database: businessRaw }),
+    });
+    const systemDb = new Kysely<SystemDB>({
+      dialect: new SqliteDialect({ database: systemRaw }),
+    });
 
-  const engine = new DataEngine(businessRaw, businessDb, systemDb);
-  await engine.metadata.warmup(); // 缓存预热
+    const engine = new DataEngine(businessRaw, businessDb, systemDb);
+    await engine.metadata.warmup(); // 缓存预热
 
-  return Object.assign(engine, {
-    async destroy() {
-      await businessDb.destroy();
-      await systemDb.destroy();
-    },
-  });
+    return Object.assign(engine, {
+      async destroy() {
+        const results = await Promise.allSettled([businessDb.destroy(), systemDb.destroy()]);
+        const failure = results.find((result) => result.status === 'rejected');
+        if (failure?.status === 'rejected') throw failure.reason;
+      },
+    });
+  } catch (error) {
+    // 工厂尚未返回句柄时，调用方无法清理；保留原始初始化异常。
+    try {
+      if (businessRaw.open) businessRaw.close();
+    } catch {
+      // 继续清理其它句柄。
+    }
+    try {
+      if (systemRaw?.open) systemRaw.close();
+    } catch {
+      // 保留原始异常。
+    }
+    throw error;
+  }
 }

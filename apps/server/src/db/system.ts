@@ -23,28 +23,37 @@ export async function initSystemDb(
 ): Promise<SystemDbHandle> {
   ensureDbDir(path);
   const raw = new Database(path);
-  for (const sql of SYSTEM_DDL) raw.exec(sql);
+  try {
+    for (const sql of SYSTEM_DDL) raw.exec(sql);
 
-  // 首启插入默认 admin（若不存在）
-  const exists = raw
-    .prepare('SELECT COUNT(*) AS c FROM admin WHERE name = ?')
-    .get(defaultAdmin.name) as { c: number };
-  if (exists.c === 0) {
-    const now = Date.now();
-    raw
-      .prepare(
-        'INSERT INTO admin (name, nickname, password_hash, must_change_password, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?)',
-      )
-      .run(defaultAdmin.name, defaultAdmin.name, hashPassword(defaultAdmin.password), now, now);
+    // 首启插入默认 admin（若不存在）
+    const exists = raw
+      .prepare('SELECT COUNT(*) AS c FROM admin WHERE name = ?')
+      .get(defaultAdmin.name) as { c: number };
+    if (exists.c === 0) {
+      const now = Date.now();
+      raw
+        .prepare(
+          'INSERT INTO admin (name, nickname, password_hash, must_change_password, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?)',
+        )
+        .run(defaultAdmin.name, defaultAdmin.name, hashPassword(defaultAdmin.password), now, now);
+    }
+
+    const db = new Kysely<ServerSystemDB>({ dialect: new SqliteDialect({ database: raw }) });
+    return {
+      raw,
+      db,
+      close: async () => {
+        await db.destroy();
+        if (raw.open) raw.close();
+      },
+    };
+  } catch (error) {
+    try {
+      if (raw.open) raw.close();
+    } catch {
+      // 保留原始初始化异常。
+    }
+    throw error;
   }
-
-  const db = new Kysely<ServerSystemDB>({ dialect: new SqliteDialect({ database: raw }) });
-  return {
-    raw,
-    db,
-    close: async () => {
-      await db.destroy();
-      raw.close();
-    },
-  };
 }

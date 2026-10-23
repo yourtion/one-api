@@ -1,4 +1,4 @@
-import type { AppConfig } from '@1api/server';
+import { parsePort, type AppConfig } from '@1api/server';
 
 export interface ServeArgs {
   port?: number;
@@ -23,12 +23,10 @@ export function parseArgs(argv: string[]): ServeArgs {
       args.noWeb = true;
     } else if (VALUE_FLAGS.has(tok)) {
       const val = argv[++i];
-      if (val === undefined) throw new Error(`参数 ${tok} 缺少值`);
+      if (val === undefined || val.trim() === '' || val.startsWith('--')) throw new Error(`参数 ${tok} 缺少值`);
       switch (tok) {
         case '--port': {
-          const n = Number(val);
-          if (!Number.isFinite(n)) throw new Error(`端口必须是数字，收到: ${val}`);
-          args.port = n;
+          args.port = parsePort(val);
           break;
         }
         case '--data-dir': args.dataDir = val; break;
@@ -51,8 +49,8 @@ export function parseArgs(argv: string[]): ServeArgs {
 export function mergeConfig(args: ServeArgs): Partial<AppConfig> {
   const cfg: Partial<AppConfig> = {};
 
-  const port = args.port ?? (process.env['PORT'] ? Number(process.env['PORT']) : undefined);
-  if (port !== undefined && Number.isFinite(port)) cfg.port = port;
+  const port = args.port ?? process.env['PORT'];
+  if (port !== undefined) cfg.port = parsePort(port);
 
   // dataDir 优先级：flag > env；用于派生 db 路径
   const dataDir = args.dataDir ?? process.env['ONE_API_DATA_DIR'];

@@ -7,26 +7,16 @@ async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const config = mergeConfig(args);
 
-  // adminRoot 三态：
-  // - --no-web → null（明确禁用，buildApp 不兜底探测）
-  // - web 已装 → dist 路径
-  // - web 未装 → undefined（让 buildApp 兜底探测；仓库内能找到 web/dist）
-  let adminRoot: string | null | undefined;
-  if (args.noWeb) {
-    adminRoot = null;
-  } else {
-    adminRoot = resolveWebDist();
-    if (!adminRoot) {
-      console.warn('⚠ @1api/web 未安装，以纯 API 模式启动。如需管理界面请安装 @1api/web 或去掉 --no-web。');
-    }
+  const adminRoot = args.noWeb ? null : (resolveWebDist() ?? null);
+  if (!args.noWeb && adminRoot === null) {
+    console.warn('⚠ @1api/web 未安装或未构建，以纯 API 模式启动。如需管理界面请安装已构建的 @1api/web。');
   }
+  const handle = createServer({ config, adminRoot });
 
-  // exactOptionalPropertyTypes：adminRoot?: string | null 不接受显式 undefined，
-  // 故条件构造 options（仅当 adminRoot 非 undefined 时挂上该字段）。null 会被传递以触发禁用。
-  const handle = createServer(adminRoot !== undefined ? { config, adminRoot } : { config });
-  await handle.listen();
-
+  let shuttingDown = false;
   const shutdown = () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     handle
       .close()
       .then(() => process.exit(0))
@@ -39,6 +29,7 @@ async function main(): Promise<void> {
   };
   process.on('SIGINT', () => shutdown());
   process.on('SIGTERM', () => shutdown());
+  await handle.listen();
 }
 
 main().catch((err) => {

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { join } from 'node:path';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -7,6 +7,7 @@ import { initSystemDb } from '../db/system.js';
 
 let dir: string;
 afterEach(() => {
+  vi.restoreAllMocks();
   if (dir) rmSync(dir, { recursive: true, force: true });
 });
 
@@ -43,5 +44,20 @@ describe('initSystemDb', () => {
     expect(count).toBe(1);
     db.close();
     await close();
+  });
+});
+
+
+describe('系统库工厂失败清理', () => {
+  it('已有库的 DDL/初始化失败时关闭尚未返回的 SQLite 句柄', async () => {
+    dir = mkdtempSync(join(tmpdir(), '1api-sys-failed-'));
+    const path = join(dir, 'system.db');
+    const bad = new Database(path);
+    bad.exec('CREATE TABLE admin (name TEXT)');
+    bad.close();
+    const close = vi.spyOn(Database.prototype, 'close');
+    await expect(initSystemDb(path)).rejects.toThrow(/nickname/);
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(close.mock.contexts[0]!.open).toBe(false);
   });
 });

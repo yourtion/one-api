@@ -21,3 +21,15 @@ describe('loadConfig', () => {
     expect(cfg.businessDbPath).toBe('/tmp/1api-test/business.db');
   });
 });
+
+describe('有效配置校验', () => {
+  afterEach(() => { delete process.env['PORT']; });
+  it.each(['abc', '', '1.5', '-1', '65536', 'Infinity'])('拒绝非法 PORT=%s', (value) => {
+    process.env['PORT'] = value;
+    expect(() => loadConfig()).toThrow(/端口|PORT/);
+  });
+  it('显式有效端口覆盖非法环境变量', () => {
+    process.env['PORT'] = 'bad';
+    expect(loadConfig({ port: 0 }).port).toBe(0);
+  });
+});

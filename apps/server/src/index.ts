@@ -1,4 +1,5 @@
 export { createServer, type ServerHandle, type CreateServerOptions } from './server.js';
+export { parsePort } from './config/index.js';
 export type { AppConfig } from './config/index.js';
 
 import { createServer } from './server.js';
@@ -7,7 +8,6 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 async function main(): Promise<void> {
   const handle = createServer();
-  await handle.listen();
 
   let shuttingDown = false;
   const shutdown = (signal: string) => {
@@ -29,6 +29,7 @@ async function main(): Promise<void> {
   };
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
+  await handle.listen();
 }
 
 // 仅当本文件作为 CLI 直接入口（node dist/index.js）时才启动；

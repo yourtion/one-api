@@ -21,11 +21,11 @@ import { registerTokenRoutes } from './routes/token.js';
 import { registerAdminRoutes } from './routes/admins.js';
 import { registerDataRoutes } from './routes/data.js';
 import { registerDataSchemaRoutes } from './routes/data-schema.js';
-import { api } from './api/instance.js';
+import { createAppApi } from './api/instance.js';
 
 /**
  * 解析 /admin 静态根目录，adminRoot 三态语义：
- * - string  → 直接用此路径（serve 注入的生产路径）
+ * - string  → 有 index.html 时用此路径（serve 注入的生产路径）
  * - null    → 明确禁用 web（--no-web），短路返回 undefined，不走兜底
  * - undefined → 自动探测：env > @1api/web 包 > 仓库兜底 > undefined
  *
@@ -35,18 +35,19 @@ import { api } from './api/instance.js';
  * 3. 仓库内 apps/web/dist（纯源码开发兜底）
  * 4. 都没有 → undefined（纯 API 模式，不挂 web）
  */
-function resolveAdminRoot(injected: string | null | undefined): string | undefined {
+export function resolveAdminRoot(injected: string | null | undefined): string | undefined {
   // null = 明确禁用：必须短路，否则兜底探测会误挂 web（--no-web 失效）
   if (injected === null) return undefined;
-  if (injected !== undefined) return injected;
+  if (injected !== undefined) return existsSync(resolvePath(injected, 'index.html')) ? injected : undefined;
   const envRoot = process.env['ONE_API_ADMIN_ROOT'];
-  if (envRoot) return envRoot;
+  if (envRoot && existsSync(resolvePath(envRoot, 'index.html'))) return envRoot;
   try {
     const pkgPath = require.resolve('@1api/web/package.json');
-    return resolvePath(pkgPath, '../dist');
+    const dist = resolvePath(pkgPath, '../dist');
+    if (existsSync(resolvePath(dist, 'index.html'))) return dist;
   } catch { /* @1api/web 未装，继续 */ }
   const devPath = resolvePath(here, '../../web/dist');
-  return existsSync(devPath) ? devPath : undefined;
+  return existsSync(resolvePath(devPath, 'index.html')) ? devPath : undefined;
 }
 
 /**
@@ -57,10 +58,11 @@ function resolveAdminRoot(injected: string | null | undefined): string | undefin
  * 4. app 级错误中间件（双参数）：兜底信封 {success:false, error:{code,message}}
  *    （erest 路由的错误已由 enveloper 的 error 函数统一包装；此中间件兜底非 erest 路由）
  *
- * routes 直接从全局单例（api / getSystemDb）取依赖，无需传参。
+ * routes 从 getSystemDb/getEngine 全局依赖取数据库；ERest 实例由每个 app 独立创建。
  */
 export function buildApp(options?: { adminRoot?: string | null }): web.Application {
   const app = new web.Application();
+  const api = createAppApi();
 
   // 1. 全局前置中间件
   // /mcp 必须在 bodyParser 之前注册：handler 直接拿原始 Node 流交给 MCP transport，
@@ -78,12 +80,12 @@ export function buildApp(options?: { adminRoot?: string | null }): web.Applicati
 
   // 2. healthz（非 /api，挂在根）
   const rootRouter = new web.Router();
-    rootRouter.get('/healthz', (ctx) => {
+  rootRouter.get('/healthz', (ctx) => {
     ctx.response.json({ success: true, data: { status: 'ok' } });
   });
   app.use('/', rootRouter);
 
-  // 3. 注册全部路由组（传全局 api 单例；systemDb 从 getSystemDb() 取）
+  // 3. 注册全部路由组（传本 app 的 api；systemDb 从 getSystemDb() 取）
   registerAuthRoutes(api);
   registerTableRoutes(api);
   registerAdminDataRoutes(api);
@@ -102,7 +104,7 @@ export function buildApp(options?: { adminRoot?: string | null }): web.Applicati
   // ⚠️ fallback 中间件保持原模式：serveStatic {index:false,fallthrough:true} + app.use('/admin', serve indexFile)。
   //   不能用裸 '*'（path-to-regexp v6 抛 Unexpected MODIFIER）；不能用 router.get('/admin/:splat*')（不匹配 /admin/ 空 splat）。
   const ADMIN_ROOT = resolveAdminRoot(options?.adminRoot);
-  if (ADMIN_ROOT && existsSync(ADMIN_ROOT)) {
+  if (ADMIN_ROOT && existsSync(resolvePath(ADMIN_ROOT, 'index.html'))) {
     app.use('/admin', web.component.serveStatic(ADMIN_ROOT, { index: false, fallthrough: true }));
     const indexFile = resolvePath(ADMIN_ROOT, 'index.html');
     app.use('/admin', (ctx) => {

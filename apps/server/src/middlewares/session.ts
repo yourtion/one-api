@@ -22,6 +22,7 @@ export function applySessionMiddleware(app: web.Application): void {
     '/',
     web.component.session({
       name: SESSION_NAME,
+      store: new web.component.SessionMemoryStore(),
       maxAge: SESSION_MAX_AGE,
       cookie: {
         httpOnly: true,

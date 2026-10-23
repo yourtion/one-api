@@ -66,17 +66,12 @@ type AppState = {
 /** 应用级 ERest 实例类型（含 AppState + LeizmWebRaw，供 route 注册函数使用以获得 typed state/raw） */
 export type AppApi = ERest<Middleware, LeiContext, AppState>;
 
-/**
- * 全局唯一 ERest 单例（forceGroup 模式 + AppState 类型安全）。
- *
- * 用 @erest/leizmweb 的 createERest 工厂创建（v3.2：构造时锁定 LeizmWebRaw + State），
- * handler 内 ctx.reply.raw 自动推导，ctx.state 类型安全。
- */
-export const api = createERest<AppState>({
-  info: API_INFO,
-  groups: GROUPS,
-  forceGroup: true,
-});
+/** 每个 app 独立注册路由，支持关闭后的下一次启动。 */
+export function createAppApi(): AppApi {
+  const instance = createERest<AppState>({ info: API_INFO, groups: GROUPS, forceGroup: true });
+  instance.setResponseEnvelopers(responseEnvelopers);
+  return instance;
+}
 
-// 注册全局响应信封（替代 utils/response.ts 的 ok/fail + 每处 reply.json(ok())）
-api.setResponseEnvelopers(responseEnvelopers);
+/** 保留给已有调用方；buildApp 使用独立实例。 */
+export const api = createAppApi();

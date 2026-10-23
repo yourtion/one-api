@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
@@ -10,7 +11,8 @@ const require = createRequire(import.meta.url);
 export function resolveWebDist(): string | undefined {
   try {
     const pkgPath = require.resolve('@1api/web/package.json');
-    return join(dirname(pkgPath), 'dist');
+    const dist = join(dirname(pkgPath), 'dist');
+    return existsSync(join(dist, 'index.html')) ? dist : undefined;
   } catch {
     return undefined;
   }

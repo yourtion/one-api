@@ -83,3 +83,21 @@ describe('mergeConfig', () => {
     // 密码无 flag 时用 server 默认 123456（mergeConfig 需补全以保证 defaultAdmin 完整）
   });
 });
+
+describe('拒绝无效输入', () => {
+  afterEach(() => { delete process.env['PORT']; });
+  it.each(['--port', '--data-dir', '--system-db', '--business-db', '--admin-name', '--admin-password'])('%s 拒绝缺值、空值和后续 flag', (flag) => {
+    for (const rest of [[], [''], ['--no-web']]) expect(() => parseArgs([flag, ...rest])).toThrow(/缺少值/);
+  });
+  it.each(['1.5', '-1', '65536', 'Infinity'])('拒绝非法端口 %s', (port) => {
+    expect(() => parseArgs(['--port', port])).toThrow(/端口/);
+  });
+  it.each(['0', '65535'])('接受边界端口 %s', (port) => {
+    expect(parseArgs(['--port', port]).port).toBe(Number(port));
+  });
+  it('非法 PORT 报错且可被有效 flag 覆盖', () => {
+    process.env['PORT'] = 'bad';
+    expect(() => mergeConfig({})).toThrow(/端口|PORT/);
+    expect(mergeConfig({ port: 0 }).port).toBe(0);
+  });
+});
