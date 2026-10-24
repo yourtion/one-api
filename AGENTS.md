@@ -29,7 +29,7 @@ one-api/
 - Phase 4（MCP）：✅ 已完成并合入 main
 - Phase 5（SDK + CLI）：✅ 已完成并合入 main
 - Phase 6（生态分发）：✅ 已完成（npm 发包 @1api/shared/engine/sdk/cli @ 0.1.0 + VitePress 文档站 + erest 自动 API 文档）
-- Phase 7（一键启动分发）：代码已实现（`@1api/serve` bin `1api` + server 库入口 + web 独立静态包）。七包 `0.1.0` 已在 npm 注册表；当前统一准备 `0.1.1`，本次仅代码和打包验收，不执行发布。
+- Phase 7（一键启动分发）：代码与打包验收已完成（`@1api/serve` bin `1api` + server 库入口 + web 独立静态包），七包 `0.1.1` 已通过仓库外 Node 22.13 / 24 安装、Node 24 真实浏览器验收。npm 已有 `0.1.0`；按用户要求，本次不发布 `0.1.1`。
 
 设计依据见 `docs/superpowers/specs/2026-06-24-one-api-overview.md` + 各 phase spec。处理稳定性修复、Phase 7 收尾及验收时，读 `docs/superpowers/specs/2026-10-23-reliability-and-phase7-completion.md` 与同名 `plans/` 文件。
 
