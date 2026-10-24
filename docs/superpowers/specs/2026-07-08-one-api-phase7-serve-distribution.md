@@ -1,8 +1,12 @@
 # Phase 7 · 一键启动分发（@1api/serve）设计
 
+> 当前状态（2026-10-24）：Phase 7 代码已实现；七个包的 `0.1.0` 均已在 npm 注册表。当前统一准备 `0.1.1` 修复版，本次仅代码和打包验收，不执行 npm 发布。
+> 本文保留 2026-07-08 历史设计与步骤；其中初始 `0.1.0` 版本号、未发布描述及勾选框不表示当前状态。收尾范围与验收以 [稳定性修复 spec](../specs/2026-10-23-reliability-and-phase7-completion.md) 和 [执行计划](../plans/2026-10-23-reliability-and-phase7-completion.md) 为准。
+> 当前契约：健康检查 `/healthz`；web 独立输出 `apps/web/dist`；engine/server/serve/CLI 要求 Node.js `^22.13.0 || >=24`。每个 app 独立路由与 session，但同一进程仅一个活动服务；第二次 listen 在建库前拒绝，close 幂等并等待启动，关闭后新句柄可重新启动，信号由 bin 处理。
+
 > 日期：2026-07-08
-> 状态：待实现
-> 依赖：Phase 1–6 已完成（shared/engine/sdk/cli 已发 npm @0.1.0；server/web 未发）
+> 原始状态（2026-07-08）：待实现（当前状态见上）
+> 原始依赖（2026-07-08）：Phase 1–6 已完成（当时 shared/engine/sdk/cli 已发 npm @0.1.0；当前七包均已有 0.1.0）。
 
 ## 1. 背景与目标
 
@@ -375,7 +379,7 @@ return {
 | server | `__tests__/server-lib.test.ts` | `createServer()` 返回 handle、listen/close 行为、adminRoot 注入后 `/admin/` 可访问、无 adminRoot 时纯 API |
 | serve | `__tests__/args.test.ts` | `parseArgs`（各 flag）、`mergeConfig` 优先级（flag>env>默认）、未知 flag 报错 |
 | serve | `__tests__/resolve-web.test.ts` | `resolveWebDist` 找到 / 找不到两种情况 |
-| serve | `__tests__/smoke.test.ts` | 真起进程：curl `/admin/` → 200、curl `/api/healthz` → 信封、`--no-web` 时 `/admin/` 不存在 |
+| serve | `__tests__/smoke.test.ts` | 真起进程：curl `/admin/` → 200、curl `/healthz` → 信封、`--no-web` 时 `/admin/` 不存在 |
 
 **回归保障：**
 - `app.ts` 的 `buildApp()` 无参行为 = 现状，现有 `static-admin.test.ts` 不改。
@@ -395,7 +399,7 @@ return {
 
 ## 5. 验收标准
 
-1. **本地可跑：** `pnpm -r build` 后，`node packages/serve/dist/index.js` 启动成功，`/admin/` 可访问 web，`/api/healthz` 返回信封。
+1. **本地可跑：** `pnpm -r build` 后，`node packages/serve/dist/index.js` 启动成功，`/admin/` 可访问 web，`/healthz` 返回信封。
 2. **--no-web：** `1api --no-web` 启动成功，`/admin/` 返回 404，`/api/*` 正常。
 3. **flag 优先级：** `1api --port 8080` 在端口 8080 启动；`PORT=9000 1api` 在 9000 启动；`1api --port 8080`（同时 `PORT=9000`）在 8080 启动。
 4. **--data-dir：** `1api --data-dir /tmp/test` 在该目录创建 system.db + business.db。

@@ -36,4 +36,5 @@ export const Errors = {
   invalidToken: () => new AppError(ErrorCode.INVALID_TOKEN, 401, '无效或已过期的 Token'),
   forbidden: () => new AppError(ErrorCode.FORBIDDEN, 403, '无权执行此操作'),
   authInvalidCredentials: () => new AppError(ErrorCode.UNAUTHORIZED, 401, '用户名或密码错误'),
+  authPasswordChangeRequired: () => new AppError(ErrorCode.AUTH_PASSWORD_CHANGE_REQUIRED, 403, '请先修改密码'),
 };

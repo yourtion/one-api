@@ -1,3 +1,4 @@
+import { ONE_API_VERSION } from '@1api/shared';
 /**
  * 路由分组定义（forceGroup 模式）。
  *
@@ -11,7 +12,7 @@
 export const API_INFO = {
   title: 'one-api',
   description: 'AI native 数据库 HTTP API',
-  version: '1.0.0',
+  version: ONE_API_VERSION,
   host: 'http://localhost:3000',
   // basePath 用于文档生成；测试脚手架 findApi 用完整路径匹配，故设空（prefix 已含相对路径）。
   basePath: '',

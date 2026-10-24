@@ -106,6 +106,101 @@ describe('MetadataStore', () => {
   });
 
   describe('refreshMeta diff（保留用户标记）', () => {
+    it('兼容的存储保留逻辑类型和展示标记，多次刷新及缓存预热不变', async () => {
+      dbs.businessRaw.exec(`CREATE TABLE events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        active INTEGER NOT NULL DEFAULT 1,
+        scheduled TEXT,
+        is_visible INTEGER DEFAULT 1,
+        status TEXT DEFAULT 'draft'
+      )`);
+      const created = await store.createMeta({
+        name: 'events',
+        label: '事件',
+        primaryKey: 'id',
+        fields: [
+          f('id', { sqliteType: 'INTEGER', jsonType: 'integer', isPrimary: true }),
+          f('active', {
+            sqliteType: 'INTEGER',
+            jsonType: 'boolean',
+            label: '启用',
+            isHidden: true,
+            isReadonly: true,
+          }),
+          f('scheduled', { jsonType: 'datetime', label: '排期' }),
+          f('is_visible', { sqliteType: 'INTEGER', jsonType: 'integer' }),
+          f('status', { label: '状态', enumValues: ['draft', 'published'] }),
+        ],
+      });
+      await store.refreshMeta(created.id);
+      await store.refreshMeta(created.id);
+      const restarted = new MetadataStore(dbs.systemDb, dbs.businessRaw);
+      await restarted.warmup();
+      const after = (await restarted.getMetaByName('events'))!;
+      expect(after.fields).toMatchObject([
+        { name: 'id', isPrimary: true, isAutoIncrement: true },
+        {
+          name: 'active',
+          jsonType: 'boolean',
+          label: '启用',
+          nullable: false,
+          defaultValue: 1,
+          isHidden: true,
+          isReadonly: true,
+        },
+        { name: 'scheduled', jsonType: 'datetime', label: '排期' },
+        { name: 'is_visible', jsonType: 'integer' },
+        { name: 'status', label: '状态', enumValues: ['draft', 'published'], defaultValue: 'draft' },
+      ]);
+    });
+
+    it('物理类型不兼容时重新推断逻辑类型并清理失效枚举，仍保留展示标记', async () => {
+      dbs.businessRaw.exec(
+        'CREATE TABLE events (id INTEGER PRIMARY KEY, active INTEGER, scheduled TEXT, status TEXT)',
+      );
+      const created = await store.createMeta({
+        name: 'events',
+        label: '事件',
+        primaryKey: 'id',
+        fields: [
+          f('id', { sqliteType: 'INTEGER', jsonType: 'integer', isPrimary: true }),
+          f('active', { sqliteType: 'INTEGER', jsonType: 'boolean', label: '启用', isHidden: true }),
+          f('scheduled', { jsonType: 'datetime', label: '排期', isReadonly: true }),
+          f('status', { enumValues: ['draft', 'published'] }),
+        ],
+      });
+      dbs.businessRaw.exec('DROP TABLE events');
+      dbs.businessRaw.exec(`CREATE TABLE events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        active TEXT NOT NULL DEFAULT 'yes',
+        scheduled INTEGER,
+        status INTEGER
+      )`);
+      await store.refreshMeta(created.id);
+      const after = (await store.getMeta(created.id))!;
+      expect(after.fields).toMatchObject([
+        { name: 'id', isAutoIncrement: true },
+        {
+          name: 'active',
+          sqliteType: 'TEXT',
+          jsonType: 'string',
+          nullable: false,
+          defaultValue: 'yes',
+          label: '启用',
+          isHidden: true,
+        },
+        {
+          name: 'scheduled',
+          sqliteType: 'INTEGER',
+          jsonType: 'integer',
+          label: '排期',
+          isReadonly: true,
+        },
+        { name: 'status', sqliteType: 'INTEGER', jsonType: 'integer' },
+      ]);
+      expect(after.fields.find((field) => field.name === 'status')).not.toHaveProperty('enumValues');
+    });
+
     it('保留 label/isHidden/isReadonly/enumValues；结构随反射更新；新增/删除字段同步', async () => {
       // 业务库先建表
       dbs.businessRaw.exec('CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT NOT NULL, status TEXT)');

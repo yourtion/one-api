@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { setupTest, seedBusinessTable } from './helpers.js';
@@ -8,7 +8,7 @@ let t: TestSetup;
 beforeEach(async () => {
   t = await setupTest();
 });
-afterAll(async () => {
+afterEach(async () => {
   await t.cleanup();
 });
 
@@ -52,7 +52,13 @@ describe('MCP 数据 tools 端到端', () => {
       name: 'posts',
       label: '文章',
       fields: [
-        { name: 'id', jsonType: 'integer', isPrimary: true, isAutoIncrement: true, nullable: false },
+        {
+          name: 'id',
+          jsonType: 'integer',
+          isPrimary: true,
+          isAutoIncrement: true,
+          nullable: false,
+        },
         { name: 'title', jsonType: 'string', nullable: false },
         { name: 'views', jsonType: 'integer', nullable: false, defaultValue: 0 },
       ],
@@ -83,7 +89,12 @@ describe('MCP 数据 tools 端到端', () => {
     expect(got.data.title).toBe('hi');
 
     // 6. increment_field
-    await callToolJson(client, 'increment_field', { table: 'posts', pk: 1, field: 'views', count: 5 });
+    await callToolJson(client, 'increment_field', {
+      table: 'posts',
+      pk: 1,
+      field: 'views',
+      count: 5,
+    });
     const got2 = await callToolJson(client, 'get_record', { table: 'posts', pk: 1 });
     expect(got2.data.views).toBe(5);
 
@@ -106,9 +117,16 @@ describe('MCP 数据 tools 端到端', () => {
   it('list 支持分页/排序/过滤/q', async () => {
     const client = await mcpClient({ tables: ['*'], actions: ['read', 'write', 'schema'] });
     await callToolJson(client, 'create_table', {
-      name: 'items', label: '项',
+      name: 'items',
+      label: '项',
       fields: [
-        { name: 'id', jsonType: 'integer', isPrimary: true, isAutoIncrement: true, nullable: false },
+        {
+          name: 'id',
+          jsonType: 'integer',
+          isPrimary: true,
+          isAutoIncrement: true,
+          nullable: false,
+        },
         { name: 'name', jsonType: 'string', nullable: false },
         { name: 'qty', jsonType: 'integer', nullable: false, defaultValue: 0 },
       ],
@@ -117,15 +135,23 @@ describe('MCP 数据 tools 端到端', () => {
       await callToolJson(client, 'create_record', { table: 'items', data: { name, qty: 10 } });
     }
     // 排序
-    const sorted = await callToolJson(client, 'list_records', { table: 'items', order: 'name:desc' });
-    expect(sorted.data.rows.map((r: { name: string }) => r.name)).toEqual(['cherry', 'banana', 'apple']);
+    const sorted = await callToolJson(client, 'list_records', {
+      table: 'items',
+      order: 'name:desc',
+    });
+    expect(sorted.data.rows.map((r: { name: string }) => r.name)).toEqual([
+      'cherry',
+      'banana',
+      'apple',
+    ]);
     // q 搜索
     const searched = await callToolJson(client, 'list_records', { table: 'items', q: 'an' });
     expect(searched.data.total).toBe(1);
     expect(searched.data.rows[0].name).toBe('banana');
     // 过滤
     const filtered = await callToolJson(client, 'list_records', {
-      table: 'items', filters: { name: ['eq', 'apple'] },
+      table: 'items',
+      filters: { name: ['eq', 'apple'] },
     });
     expect(filtered.data.total).toBe(1);
     await client.close();
@@ -134,8 +160,17 @@ describe('MCP 数据 tools 端到端', () => {
   it('get_record 主键不存在 → isError', async () => {
     const client = await mcpClient({ tables: ['*'], actions: ['read', 'write', 'schema'] });
     await callToolJson(client, 'create_table', {
-      name: 'miss', label: 'm',
-      fields: [{ name: 'id', jsonType: 'integer', isPrimary: true, isAutoIncrement: true, nullable: false }],
+      name: 'miss',
+      label: 'm',
+      fields: [
+        {
+          name: 'id',
+          jsonType: 'integer',
+          isPrimary: true,
+          isAutoIncrement: true,
+          nullable: false,
+        },
+      ],
     });
     const r = await callToolJson(client, 'get_record', { table: 'miss', pk: 999 });
     expect(r.isError).toBe(true);
@@ -145,9 +180,16 @@ describe('MCP 数据 tools 端到端', () => {
   it('increment_field 不传 count → 默认 +1', async () => {
     const client = await mcpClient({ tables: ['*'], actions: ['read', 'write', 'schema'] });
     await callToolJson(client, 'create_table', {
-      name: 'cnt', label: 'c',
+      name: 'cnt',
+      label: 'c',
       fields: [
-        { name: 'id', jsonType: 'integer', isPrimary: true, isAutoIncrement: true, nullable: false },
+        {
+          name: 'id',
+          jsonType: 'integer',
+          isPrimary: true,
+          isAutoIncrement: true,
+          nullable: false,
+        },
         { name: 'n', jsonType: 'integer', nullable: false, defaultValue: 0 },
       ],
     });
@@ -162,9 +204,16 @@ describe('MCP 数据 tools 端到端', () => {
   it('list_records 显式 page/size 分页', async () => {
     const client = await mcpClient({ tables: ['*'], actions: ['read', 'write', 'schema'] });
     await callToolJson(client, 'create_table', {
-      name: 'paged', label: 'p',
+      name: 'paged',
+      label: 'p',
       fields: [
-        { name: 'id', jsonType: 'integer', isPrimary: true, isAutoIncrement: true, nullable: false },
+        {
+          name: 'id',
+          jsonType: 'integer',
+          isPrimary: true,
+          isAutoIncrement: true,
+          nullable: false,
+        },
         { name: 'v', jsonType: 'string', nullable: true },
       ],
     });
@@ -202,9 +251,16 @@ describe('MCP 权限边界', () => {
     // 先用全权 token 建表+建记录
     const setup = await mcpClient({ tables: ['*'], actions: ['read', 'write', 'schema'] });
     await callToolJson(setup, 'create_table', {
-      name: 'sec', label: 's',
+      name: 'sec',
+      label: 's',
       fields: [
-        { name: 'id', jsonType: 'integer', isPrimary: true, isAutoIncrement: true, nullable: false },
+        {
+          name: 'id',
+          jsonType: 'integer',
+          isPrimary: true,
+          isAutoIncrement: true,
+          nullable: false,
+        },
         { name: 'n', jsonType: 'string', nullable: true },
       ],
     });
@@ -221,7 +277,8 @@ describe('MCP 权限边界', () => {
   it('token 无 schema action → create_table/add_field 拒绝', async () => {
     const rw = await mcpClient({ tables: ['*'], actions: ['read', 'write'] });
     const r = await callToolJson(rw, 'create_table', {
-      name: 'nope', label: 'n',
+      name: 'nope',
+      label: 'n',
       fields: [{ name: 'id', jsonType: 'integer', isPrimary: true, nullable: false }],
     });
     expect(r.isError).toBe(true);
@@ -231,11 +288,13 @@ describe('MCP 权限边界', () => {
   it('tables 白名单外 → 拒绝', async () => {
     const setup = await mcpClient({ tables: ['*'], actions: ['read', 'write', 'schema'] });
     await callToolJson(setup, 'create_table', {
-      name: 'allowed', label: 'a',
+      name: 'allowed',
+      label: 'a',
       fields: [{ name: 'id', jsonType: 'integer', isPrimary: true, nullable: false }],
     });
     await callToolJson(setup, 'create_table', {
-      name: 'denied', label: 'd',
+      name: 'denied',
+      label: 'd',
       fields: [{ name: 'id', jsonType: 'integer', isPrimary: true, nullable: false }],
     });
     await setup.close();
@@ -274,7 +333,9 @@ describe('MCP 权限边界', () => {
   });
 
   it('失效 token（is_active=0）→ connect 拒绝', async () => {
-    await expect(mcpClient({ tables: ['*'], actions: ['read'] }, { isActive: false })).rejects.toThrow();
+    await expect(
+      mcpClient({ tables: ['*'], actions: ['read'] }, { isActive: false }),
+    ).rejects.toThrow();
   });
 
   it('过期 token → connect 拒绝', async () => {
@@ -287,7 +348,8 @@ describe('MCP 权限边界', () => {
     const client = await mcpClient({ tables: ['*'], actions: ['read', 'write', 'schema'] });
     for (const reserved of ['schema', 'records', 'incr']) {
       const r = await callToolJson(client, 'create_table', {
-        name: reserved, label: 'x',
+        name: reserved,
+        label: 'x',
         fields: [{ name: 'id', jsonType: 'integer', isPrimary: true, nullable: false }],
       });
       expect(r.isError).toBe(true);
@@ -298,8 +360,17 @@ describe('MCP 权限边界', () => {
   it('create_table 带 note + autoTimestamps → 成功且挂载时间戳字段', async () => {
     const client = await mcpClient({ tables: ['*'], actions: ['read', 'write', 'schema'] });
     const r = await callToolJson(client, 'create_table', {
-      name: 'withmeta', label: '带元信息',
-      fields: [{ name: 'id', jsonType: 'integer', isPrimary: true, isAutoIncrement: true, nullable: false }],
+      name: 'withmeta',
+      label: '带元信息',
+      fields: [
+        {
+          name: 'id',
+          jsonType: 'integer',
+          isPrimary: true,
+          isAutoIncrement: true,
+          nullable: false,
+        },
+      ],
       note: '测试备注',
       autoTimestamps: true,
     });

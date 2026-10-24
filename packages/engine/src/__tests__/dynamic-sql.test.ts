@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { type TableMeta } from '@1api/shared';
+import { type ListOptions, type TableMeta } from '@1api/shared';
 import { createTestDbs, type TestDbs } from '../test-helpers.js';
 import { DynamicSql } from '../dynamic-sql.js';
 
@@ -134,6 +134,81 @@ describe('DynamicSql', () => {
 
     it('q 模糊（TEXT 非主键 OR LIKE）', async () => {
       expect((await dyn.selectList(meta(), { q: 'b' })).total).toBe(1);
+    });
+
+    describe('q 与字段过滤组合', () => {
+      let searchMeta: TableMeta;
+
+      beforeEach(() => {
+        dbs.businessRaw.exec(
+          'CREATE TABLE search_posts (id INTEGER PRIMARY KEY, views INTEGER, title TEXT, description TEXT)',
+        );
+        const fields = meta().fields.filter((f) => f.name !== 'created_at');
+        const title = fields.find((f) => f.name === 'title')!;
+        searchMeta = meta({
+          name: 'search_posts',
+          fields: [...fields, { ...title, name: 'description', label: '描述' }],
+        });
+        const insert = dbs.businessRaw.prepare(
+          'INSERT INTO search_posts (id, views, title, description) VALUES (?, ?, ?, ?)',
+        );
+        insert.run(1, 1, 'needle', 'x');
+        insert.run(2, 2, 'x', 'needle');
+        insert.run(3, 1, 'x', 'needle');
+        insert.run(4, 1, 'x', 'x');
+        insert.run(5, 1, 'needle', 'needle');
+        insert.run(6, 2, 'needle', 'x');
+      });
+
+      it('所有关键词命中列都必须满足字段过滤，双列命中只计一行', async () => {
+        const result = await dyn.selectList(searchMeta, {
+          filters: { views: ['eq', 1] },
+          q: 'needle',
+          order: 'id:asc',
+        });
+        expect(result.rows.map((row) => row.id)).toEqual([1, 3, 5]);
+        expect(result.total).toBe(3);
+      });
+
+      it('多个过滤条件同时生效，分页与 total 使用相同条件', async () => {
+        const options = {
+          filters: { views: ['eq', 1], id: ['gt', 1] },
+          q: 'needle',
+          order: 'id:asc',
+          size: 1,
+        } satisfies ListOptions;
+        for (const [page, expectedIds] of [[1, [3]], [2, [5]], [3, []]] as const) {
+          const result = await dyn.selectList(searchMeta, { ...options, page });
+          expect(result.rows.map((row) => row.id)).toEqual(expectedIds);
+          expect(result.total).toBe(2);
+          expect(result.page).toBe(page);
+          expect(result.size).toBe(1);
+        }
+      });
+
+      it('仅关键词仍跨文本列匹配，仅过滤仍按 AND 组合', async () => {
+        const searched = await dyn.selectList(searchMeta, { q: 'needle', order: 'id:asc' });
+        expect(searched.rows.map((row) => row.id)).toEqual([1, 2, 3, 5, 6]);
+        expect(searched.total).toBe(5);
+        const filtered = await dyn.selectList(searchMeta, {
+          filters: { views: ['eq', 1], id: ['gt', 1] },
+          order: 'id:asc',
+        });
+        expect(filtered.rows.map((row) => row.id)).toEqual([3, 4, 5]);
+        expect(filtered.total).toBe(3);
+      });
+
+      it('组合查询的关键词仍作为参数，未知过滤列仍被拒绝', async () => {
+        const result = await dyn.selectList(searchMeta, {
+          filters: { views: ['eq', 1] },
+          q: "' OR 1=1 --",
+        });
+        expect(result.rows).toEqual([]);
+        expect(result.total).toBe(0);
+        await expect(
+          dyn.selectList(searchMeta, { filters: { evil: ['eq', 1] }, q: 'needle' }),
+        ).rejects.toThrow(/字段不存在/);
+      });
     });
 
     it('datetime 字段多格式归一为 ISO8601（ISO8601 / SQLite 原生 / Unix 秒 / 毫秒 / 无法解析原样返回）', async () => {

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { ONE_API_VERSION } from '@1api/shared';
 import { Command } from 'commander';
 import { registerConnectCommand } from './commands/connect.js';
 import { registerConfigCommand } from './commands/config-cmd.js';
@@ -17,7 +18,7 @@ const program = new Command();
 program
   .name('one-api-cli')
   .description('one-api 终端工具（远程模式走 HTTP，本地模式直连 SQLite）')
-  .version('0.0.0')
+  .version(ONE_API_VERSION)
   .option('-H, --host <url>', '远程 server 地址（覆盖配置文件）')
   .option('-T, --token <token>', '远程 token')
   .option('-D, --db <path>', '本地业务库路径')
@@ -26,9 +27,16 @@ program
 /** 解析全局 flag + 配置文件 → Connection（延迟建立：仅需要时）。 */
 async function getConnection(): Promise<Connection> {
   const opts = program.opts();
-  const cfg = resolveConnectOptions({ host: opts.host, token: opts.token, db: opts.db, systemDb: opts.systemDb });
+  const cfg = resolveConnectOptions({
+    host: opts.host,
+    token: opts.token,
+    db: opts.db,
+    systemDb: opts.systemDb,
+  });
   if (!cfg) {
-    console.error('✗ 未配置连接。请先运行：one-api-cli connect --host <url> --token <t>（或 --db <path>）');
+    console.error(
+      '✗ 未配置连接。请先运行：one-api-cli connect --host <url> --token <t>（或 --db <path>）',
+    );
     process.exit(1);
   }
   if (cfg.mode === 'remote') {

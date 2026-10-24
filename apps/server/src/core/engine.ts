@@ -18,7 +18,7 @@ export function getEngine(): DataEngine & { destroy(): Promise<void> } {
   return engineInstance;
 }
 
-/** 测试辅助：重置单例（避免用例间串扰） */
+/** 服务关闭或测试清理后重置单例，使下一生命周期重新创建 engine */
 export function _resetEngine(): void {
   engineInstance = null;
 }

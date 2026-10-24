@@ -1,9 +1,8 @@
 {
   "name": "@1api/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "bin": {
     "one-api-cli": "./dist/index.js"
   },
@@ -33,9 +32,11 @@
     "command-line"
   ],
   "preferGlobal": true,
-  "publishConfig": { "access": "public" },
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
-    "node": ">=18"
+    "node": "^22.13.0 || >=24"
   },
   "scripts": {
     "build": "tsup",

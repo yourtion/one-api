@@ -21,8 +21,7 @@ beforeAll(async () => {
   writeFileSync(join(adminDir, 'index.html'), '<!doctype html><div id="app">shell</div>');
   writeFileSync(join(adminDir, 'assets', 'app.js'), 'console.log(1)');
 
-  // buildApp 内部 registerAuthRoutes 等需 systemDb 已装配（且 erest api 是全局单例，
-  // 仅注册一次——故 buildApp 全程只调一次）
+  // buildApp 内部 registerAuthRoutes 等需 systemDb 已装配。
   _resetEngine();
   const systemDbPath = join(dir, 'system.db');
   const businessDbPath = join(dir, 'business.db');

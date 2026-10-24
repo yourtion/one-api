@@ -12,12 +12,18 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "start": "node apps/server/dist/index.js",
+    "release": "pnpm quality && pnpm release:preflight && pnpm -r publish --no-git-checks --access public",
     "docs:dev": "pnpm --filter @1api/docs docs:dev",
     "docs:build": "pnpm --filter @1api/docs docs:build",
-    "docs:gen-api": "pnpm --filter @1api/docs gen:api-docs"
+    "docs:gen-api": "pnpm --filter @1api/docs gen:api-docs",
+    "coverage": "pnpm --filter @1api/shared --filter @1api/engine --filter @1api/sdk --filter @1api/cli --filter @1api/server --filter @1api/serve exec vitest run --coverage",
+    "quality": "pnpm -r build && pnpm -r typecheck && pnpm -r test && pnpm test:release && pnpm coverage && pnpm lint",
+    "release:preflight": "node scripts/release-preflight.mjs",
+    "test:release": "node --test scripts/release-preflight.test.mjs"
   },
   "devDependencies": {
     "oxlint": "^0.9.0",
-    "typescript": "^5.8.0"
+    "typescript": "^5.8.0",
+    "oxfmt": "0.74.0"
   }
 }
