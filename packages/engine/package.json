@@ -20,7 +20,7 @@
   "author": "Yourtion <yourtion@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourtion/one-api.git",
+    "url": "git+https://github.com/yourtion/one-api.git",
     "directory": "packages/engine"
   },
   "homepage": "https://github.com/yourtion/one-api#readme",

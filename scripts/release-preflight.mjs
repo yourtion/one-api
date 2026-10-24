@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const runtimeEngine = '^22.13.0 || >=24';
-const packages = [
+export const publishedDirectories = [
   'packages/shared',
   'packages/engine',
   'packages/sdk',
@@ -16,6 +16,23 @@ const packages = [
   'apps/web',
   'packages/serve',
 ];
+// npm discards build metadata, so accepted versions must round-trip unchanged.
+const number = '(?:0|[1-9][0-9]*)';
+const identifier = `(?:${number}|[0-9]*[A-Za-z-][0-9A-Za-z-]*)`;
+const releaseVersionPattern = new RegExp(
+  `^${number}\\.${number}\\.${number}(?:-${identifier}(?:\\.${identifier})*)?$`,
+);
+export function isReleaseVersion(version) {
+  return (
+    typeof version === 'string' &&
+    version.length <= 256 &&
+    releaseVersionPattern.test(version) &&
+    version
+      .split('-')[0]
+      .split('.')
+      .every((part) => BigInt(part) <= BigInt(Number.MAX_SAFE_INTEGER))
+  );
+}
 const runtimePackages = new Set(['@1api/engine', '@1api/cli', '@1api/server', '@1api/serve']);
 
 /** 校验发布包的真实文件契约；无需网络或 npm registry。 */
@@ -70,8 +87,10 @@ export async function preflight(directory = root) {
   );
   const sharedPath = resolve(directory, 'packages/shared');
   const { version } = JSON.parse(readFileSync(resolve(sharedPath, 'package.json'), 'utf8'));
-  assert.match(version, /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/, '发布版本必须为稳定 semver');
-  const manifests = packages.map((path) => inspectPackage(resolve(directory, path), version));
+  assert.ok(isReleaseVersion(version), '发布版本必须为严格 semver（不含 build metadata）');
+  const manifests = publishedDirectories.map((path) =>
+    inspectPackage(resolve(directory, path), version),
+  );
   const load = (path) => import(pathToFileURL(resolve(directory, path)).href);
   const shared = await load('packages/shared/dist/index.js');
   assert.equal(shared.ONE_API_VERSION, version, 'shared dist 版本过期，请重新 build');
