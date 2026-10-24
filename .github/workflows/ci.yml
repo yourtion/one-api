@@ -49,7 +49,7 @@ jobs:
       - name: Test
         run: pnpm -r test
 
-      - name: Release contract tests
+      - name: Release contract and Trusted Publishing helper tests
         run: pnpm test:release
 
       - name: Core coverage

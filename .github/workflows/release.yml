@@ -1,0 +1,59 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  # Serialize all versions; latest must not race between tags.
+  # GitHub retains only one pending run: push the next tag after completion.
+  group: npm-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          # Current Node 24 provides npm with OIDC support; verify at runtime.
+          # No registry-url: setup-node must not inject token authentication.
+          node-version: '24'
+
+      # Run before pnpm setup/install or any dependency/lifecycle mutations.
+      - name: Validate tag, all package versions and main ancestry
+        run: node scripts/npm-release.mjs check "$RELEASE_TAG"
+
+      - name: Verify npm supports Trusted Publishing
+        run: node scripts/npm-release.mjs npm-version
+
+      - uses: pnpm/action-setup@v4 # packageManager pins pnpm 9.12.0
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm quality
+      - run: pnpm release:preflight
+
+      - name: Pack and verify seven public packages
+        run: node scripts/npm-release.mjs pack "$RELEASE_TAG" "$RUNNER_TEMP/npm-release"
+
+      # Each npm package must bind owner yourtion, repo one-api, release.yml,
+      # no environment, and Allowed actions permitting direct npm publish.
+      # No NPM_TOKEN; npm CLI publishes the same verified pnpm tarballs via OIDC.
+      - name: Publish packages, then complete GitHub Release and assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/npm-release.mjs publish "$RELEASE_TAG" "$RUNNER_TEMP/npm-release"

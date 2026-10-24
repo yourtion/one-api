@@ -72,6 +72,8 @@ pnpm quality        # build + typecheck + test + 发布脚本测试 + coverage +
 pnpm release:preflight # 检查版本、包入口与 HTTP/CLI/MCP 版本身份
 ```
 
+npm 自动发布与 Trusted Publisher 一次性配置见 [npm 发包说明](docs/npm-publishing.md)。
+
 ## License
 
 [MIT](./LICENSE)

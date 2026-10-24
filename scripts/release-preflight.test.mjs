@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { inspectPackage } from './release-preflight.mjs';
+import { inspectPackage, isReleaseVersion } from './release-preflight.mjs';
 
 const directories = [];
 afterEach(() => {
@@ -35,6 +35,14 @@ function artifact(overrides = {}) {
 
 test('可发布的 bin 包无需声明不存在的类型入口', () => {
   assert.equal(inspectPackage(artifact(), '0.1.1').name, '@1api/cli');
+});
+test('预检允许严格预发布版本，拒绝 npm 无法原样保留的版本', () => {
+  for (const version of ['0.1.1', '0.1.1-rc.1', '0.1.1-0']) {
+    assert.equal(isReleaseVersion(version), true);
+    assert.equal(inspectPackage(artifact({ version }), version).version, version);
+  }
+  for (const version of ['01.1.1', '0.1.1-01', '0.1.1+build', '9007199254740992.0.0'])
+    assert.equal(isReleaseVersion(version), false);
 });
 test('拒绝版本不一致或与传递依赖不兼容的运行时范围', () => {
   assert.throws(() => inspectPackage(artifact({ version: '0.1.0' }), '0.1.1'), /version/);
