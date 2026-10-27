@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Command } from 'commander';
 import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -6,13 +6,20 @@ import { join } from 'node:path';
 import { setupTest } from '@1api/server/__tests__/helpers.js';
 import type { TestSetup } from '@1api/server/__tests__/helpers.js';
 import { registerDataCommands } from '../commands/data.js';
-import { registerTablesCommand, registerTablesCreateCommand, registerAddFieldCommand } from '../commands/tables.js';
+import {
+  registerTablesCommand,
+  registerTablesCreateCommand,
+  registerAddFieldCommand,
+} from '../commands/tables.js';
 import { registerConnectCommand } from '../commands/connect.js';
-import { createRemoteConnection, type Connection } from '../connection.js';
+import { createLocalConnection, createRemoteConnection, type Connection } from '../connection.js';
+
+import { confirm } from '@inquirer/prompts';
+
+vi.mock('@inquirer/prompts', () => ({ confirm: vi.fn() }));
 
 let t: TestSetup;
 let baseUrl: string;
-
 
 /** 构造一个 commander program，注入预建的 Connection（跳过 config 解析）。 */
 function buildProgram(conn: Connection): Command {
@@ -53,7 +60,7 @@ describe('CLI 命令端到端（远程）', () => {
     // ⚠️ setupTest 在根路径挂载 erest，data 路由在 /data/*（非 /api/data/*）
     baseUrl = `${new URL(t.mcpUrl).origin}/data`;
   });
-  afterAll(async () => {
+  afterEach(async () => {
     await t.cleanup();
   });
 
@@ -61,8 +68,24 @@ describe('CLI 命令端到端（远程）', () => {
     const token = await t.insertToken({ tables: ['*'], actions: ['read', 'write', 'schema'] });
     const conn = createRemoteConnection(baseUrl, token);
 
-    await run(buildProgram(conn), 'tables-create', 'widgets', '--fields', 'id:integer,name:string', '-F', 'json');
-    const createRes = await run(buildProgram(conn), 'create', 'widgets', '-d', '{"name":"w1"}', '-F', 'json');
+    await run(
+      buildProgram(conn),
+      'tables-create',
+      'widgets',
+      '--fields',
+      'id:integer,name:string',
+      '-F',
+      'json',
+    );
+    const createRes = await run(
+      buildProgram(conn),
+      'create',
+      'widgets',
+      '-d',
+      '{"name":"w1"}',
+      '-F',
+      'json',
+    );
     const created = JSON.parse(createRes.stdout);
     expect(created.name).toBe('w1');
 
@@ -75,13 +98,23 @@ describe('CLI 命令端到端（远程）', () => {
     expect(JSON.parse(getRes.stdout).name).toBe('w2');
 
     await run(buildProgram(conn), 'delete', 'widgets', String(pk), '-y');
-    expect(JSON.parse((await run(buildProgram(conn), 'list', 'widgets', '-F', 'json')).stdout).total).toBe(0);
+    expect(
+      JSON.parse((await run(buildProgram(conn), 'list', 'widgets', '-F', 'json')).stdout).total,
+    ).toBe(0);
   });
 
   it('describe -F json 输出 TableMeta', async () => {
     const token = await t.insertToken({ tables: ['*'], actions: ['read', 'schema'] });
     const conn = createRemoteConnection(baseUrl, token);
-    await run(buildProgram(conn), 'tables-create', 'things', '--fields', 'id:integer', '-F', 'json');
+    await run(
+      buildProgram(conn),
+      'tables-create',
+      'things',
+      '--fields',
+      'id:integer',
+      '-F',
+      'json',
+    );
     const res = await run(buildProgram(conn), 'describe', 'things', '-F', 'json');
     const meta = JSON.parse(res.stdout);
     expect(meta.name).toBe('things');
@@ -90,7 +123,15 @@ describe('CLI 命令端到端（远程）', () => {
   it('list --format csv 输出 CSV', async () => {
     const token = await t.insertToken({ tables: ['*'], actions: ['read', 'write', 'schema'] });
     const conn = createRemoteConnection(baseUrl, token);
-    await run(buildProgram(conn), 'tables-create', 'csv_t', '--fields', 'id:integer,n:string', '-F', 'json');
+    await run(
+      buildProgram(conn),
+      'tables-create',
+      'csv_t',
+      '--fields',
+      'id:integer,n:string',
+      '-F',
+      'json',
+    );
     await run(buildProgram(conn), 'create', 'csv_t', '-d', '{"n":"a"}');
     await run(buildProgram(conn), 'create', 'csv_t', '-d', '{"n":"b"}');
     const res = await run(buildProgram(conn), 'list', 'csv_t', '-F', 'csv');
@@ -103,17 +144,41 @@ describe('CLI 命令端到端（远程）', () => {
   it('list --where 过滤', async () => {
     const token = await t.insertToken({ tables: ['*'], actions: ['read', 'write', 'schema'] });
     const conn = createRemoteConnection(baseUrl, token);
-    await run(buildProgram(conn), 'tables-create', 'flt', '--fields', 'id:integer,n:string', '-F', 'json');
+    await run(
+      buildProgram(conn),
+      'tables-create',
+      'flt',
+      '--fields',
+      'id:integer,n:string',
+      '-F',
+      'json',
+    );
     await run(buildProgram(conn), 'create', 'flt', '-d', '{"n":"apple"}');
     await run(buildProgram(conn), 'create', 'flt', '-d', '{"n":"banana"}');
-    const res = await run(buildProgram(conn), 'list', 'flt', '--where', 'n__eq=apple', '-F', 'json');
+    const res = await run(
+      buildProgram(conn),
+      'list',
+      'flt',
+      '--where',
+      'n__eq=apple',
+      '-F',
+      'json',
+    );
     expect(JSON.parse(res.stdout).total).toBe(1);
   });
 
   it('export → 文件（CSV）+ import 回来', async () => {
     const token = await t.insertToken({ tables: ['*'], actions: ['read', 'write', 'schema'] });
     const conn = createRemoteConnection(baseUrl, token);
-    await run(buildProgram(conn), 'tables-create', 'exp', '--fields', 'id:integer,n:string', '-F', 'json');
+    await run(
+      buildProgram(conn),
+      'tables-create',
+      'exp',
+      '--fields',
+      'id:integer,n:string',
+      '-F',
+      'json',
+    );
     await run(buildProgram(conn), 'create', 'exp', '-d', '{"n":"a"}');
     await run(buildProgram(conn), 'create', 'exp', '-d', '{"n":"b"}');
 
@@ -129,7 +194,15 @@ describe('CLI 命令端到端（远程）', () => {
       expect(csv).toContain('b');
 
       // 导入到新表
-      await run(buildProgram(conn), 'tables-create', 'imp', '--fields', 'id:integer,n:string', '-F', 'json');
+      await run(
+        buildProgram(conn),
+        'tables-create',
+        'imp',
+        '--fields',
+        'id:integer,n:string',
+        '-F',
+        'json',
+      );
       const impRes = await run(buildProgram(conn), 'import', 'imp', csvPath);
       expect(impRes.stdout).toContain('成功 2/2');
       const listRes = await run(buildProgram(conn), 'list', 'imp', '-F', 'json');
@@ -142,7 +215,15 @@ describe('CLI 命令端到端（远程）', () => {
   it('export → stdout（JSON）', async () => {
     const token = await t.insertToken({ tables: ['*'], actions: ['read', 'write', 'schema'] });
     const conn = createRemoteConnection(baseUrl, token);
-    await run(buildProgram(conn), 'tables-create', 'expj', '--fields', 'id:integer,n:string', '-F', 'json');
+    await run(
+      buildProgram(conn),
+      'tables-create',
+      'expj',
+      '--fields',
+      'id:integer,n:string',
+      '-F',
+      'json',
+    );
     await run(buildProgram(conn), 'create', 'expj', '-d', '{"n":"x"}');
     const res = await run(buildProgram(conn), 'export', 'expj', '-F', 'json');
     const arr = JSON.parse(res.stdout);
@@ -153,7 +234,15 @@ describe('CLI 命令端到端（远程）', () => {
   it('import JSON 文件', async () => {
     const token = await t.insertToken({ tables: ['*'], actions: ['read', 'write', 'schema'] });
     const conn = createRemoteConnection(baseUrl, token);
-    await run(buildProgram(conn), 'tables-create', 'impj', '--fields', 'id:integer,n:string', '-F', 'json');
+    await run(
+      buildProgram(conn),
+      'tables-create',
+      'impj',
+      '--fields',
+      'id:integer,n:string',
+      '-F',
+      'json',
+    );
     const dir = mkdtempSync(join(tmpdir(), 'cli-impj-'));
     try {
       const jsonPath = join(dir, 'data.json');
@@ -168,7 +257,15 @@ describe('CLI 命令端到端（远程）', () => {
   it('create --data-file 从文件读 JSON', async () => {
     const token = await t.insertToken({ tables: ['*'], actions: ['read', 'write', 'schema'] });
     const conn = createRemoteConnection(baseUrl, token);
-    await run(buildProgram(conn), 'tables-create', 'df', '--fields', 'id:integer,n:string', '-F', 'json');
+    await run(
+      buildProgram(conn),
+      'tables-create',
+      'df',
+      '--fields',
+      'id:integer,n:string',
+      '-F',
+      'json',
+    );
     const dir = mkdtempSync(join(tmpdir(), 'cli-datafile-'));
     try {
       const f = join(dir, 'r.json');
@@ -183,7 +280,15 @@ describe('CLI 命令端到端（远程）', () => {
   it('create -d @file 简写读文件', async () => {
     const token = await t.insertToken({ tables: ['*'], actions: ['read', 'write', 'schema'] });
     const conn = createRemoteConnection(baseUrl, token);
-    await run(buildProgram(conn), 'tables-create', 'at', '--fields', 'id:integer,n:string', '-F', 'json');
+    await run(
+      buildProgram(conn),
+      'tables-create',
+      'at',
+      '--fields',
+      'id:integer,n:string',
+      '-F',
+      'json',
+    );
     const dir = mkdtempSync(join(tmpdir(), 'cli-atfile-'));
     try {
       const f = join(dir, 'r.json');
@@ -198,7 +303,15 @@ describe('CLI 命令端到端（远程）', () => {
   it('create 无 --data/--data-file → exit 1', async () => {
     const token = await t.insertToken({ tables: ['*'], actions: ['read', 'write', 'schema'] });
     const conn = createRemoteConnection(baseUrl, token);
-    await run(buildProgram(conn), 'tables-create', 'nd', '--fields', 'id:integer,n:string', '-F', 'json');
+    await run(
+      buildProgram(conn),
+      'tables-create',
+      'nd',
+      '--fields',
+      'id:integer,n:string',
+      '-F',
+      'json',
+    );
     const res = await run(buildProgram(conn), 'create', 'nd');
     expect(res.code).toBe(1);
   });
@@ -206,7 +319,9 @@ describe('CLI 命令端到端（远程）', () => {
   it('tables -F json → 远程模式抛友好错误（listTables 不支持）', async () => {
     const token = await t.insertToken({ tables: ['*'], actions: ['read', 'schema'] });
     const conn = createRemoteConnection(baseUrl, token);
-    await expect(run(buildProgram(conn), 'tables', '-f', 'json')).rejects.toThrow(/远程模式|不支持枚举/);
+    await expect(run(buildProgram(conn), 'tables', '-f', 'json')).rejects.toThrow(
+      /远程模式|不支持枚举/,
+    );
   });
 
   it('describe -F table（非 json）输出表格', async () => {
@@ -229,7 +344,15 @@ describe('CLI 命令端到端（远程）', () => {
     const conn = createRemoteConnection(baseUrl, token);
     const res = await run(
       buildProgram(conn),
-      'tables-create', 'lbl', '--fields', 'id:integer,n:string', '--label', '我的表', '--auto-timestamps', '-F', 'json',
+      'tables-create',
+      'lbl',
+      '--fields',
+      'id:integer,n:string',
+      '--label',
+      '我的表',
+      '--auto-timestamps',
+      '-F',
+      'json',
     );
     const meta = JSON.parse(res.stdout);
     expect(meta.label).toBe('我的表');
@@ -239,7 +362,15 @@ describe('CLI 命令端到端（远程）', () => {
   it('tables-create -F table（非 json）输出文本', async () => {
     const token = await t.insertToken({ tables: ['*'], actions: ['schema'] });
     const conn = createRemoteConnection(baseUrl, token);
-    const res = await run(buildProgram(conn), 'tables-create', 'tf', '--fields', 'id:integer', '-F', 'table');
+    const res = await run(
+      buildProgram(conn),
+      'tables-create',
+      'tf',
+      '--fields',
+      'id:integer',
+      '-F',
+      'table',
+    );
     expect(res.stdout).toContain('已创建');
   });
 
@@ -247,7 +378,17 @@ describe('CLI 命令端到端（远程）', () => {
     const token = await t.insertToken({ tables: ['*'], actions: ['read', 'write', 'schema'] });
     const conn = createRemoteConnection(baseUrl, token);
     await run(buildProgram(conn), 'tables-create', 'af', '--fields', 'id:integer', '-F', 'json');
-    const res = await run(buildProgram(conn), 'add-field', 'af', 'note', 'string', '-L', '备注', '-F', 'json');
+    const res = await run(
+      buildProgram(conn),
+      'add-field',
+      'af',
+      'note',
+      'string',
+      '-L',
+      '备注',
+      '-F',
+      'json',
+    );
     const fields = JSON.parse(res.stdout).fields.map((f: { name: string }) => f.name);
     expect(fields).toContain('note');
   });
@@ -298,7 +439,14 @@ describe('connect / config（全局 flag 与子命令同名冲突）', () => {
         .option('-D, --db <path>', '')
         .option('-S, --system-db <path>', '');
       registerConnectCommand(program);
-      const res = await run(program, 'connect', '--db', '/tmp/biz.db', '--system-db', '/tmp/sys.db');
+      const res = await run(
+        program,
+        'connect',
+        '--db',
+        '/tmp/biz.db',
+        '--system-db',
+        '/tmp/sys.db',
+      );
       expect(res.code).toBe(0);
       const cfg = JSON.parse(readFileSync(join(tmpHome, '.one-api-cli', 'config.json'), 'utf-8'));
       expect(cfg).toEqual({ mode: 'local', dbPath: '/tmp/biz.db', systemDbPath: '/tmp/sys.db' });
@@ -317,3 +465,104 @@ describe('connect / config（全局 flag 与子命令同名冲突）', () => {
   });
 });
 
+describe('CLI 本地命令的默认值与失败恢复', () => {
+  let dir: string;
+  let conn: Connection;
+  beforeEach(async () => {
+    dir = mkdtempSync(join(tmpdir(), 'cli-local-commands-'));
+    conn = await createLocalConnection(join(dir, 'biz.db'), join(dir, 'system.db'), null);
+    await run(
+      buildProgram(conn),
+      'tables-create',
+      'items',
+      '--fields',
+      'name,v:integer,:string',
+      '-F',
+      'json',
+    );
+  });
+  afterEach(async () => {
+    await conn.close?.();
+    rmSync(dir, { recursive: true, force: true });
+    vi.clearAllMocks();
+  });
+
+  it('tables 默认表格与 JSON，list 默认/排序/查询/分页，get 表格', async () => {
+    expect((await run(buildProgram(conn), 'tables')).stdout).toContain('items');
+    expect(
+      JSON.parse((await run(buildProgram(conn), 'tables', '-f', 'json')).stdout),
+    ).toContainEqual(expect.objectContaining({ name: 'items' }));
+    await conn.create('items', { name: 'apple', v: 2 });
+    await conn.create('items', { name: 'pear', v: 1 });
+    expect((await run(buildProgram(conn), 'list', 'items')).stdout).toContain('apple');
+    const result = JSON.parse(
+      (
+        await run(
+          buildProgram(conn),
+          'list',
+          'items',
+          '--order',
+          'v:desc',
+          '--query',
+          'apple',
+          '--limit',
+          '1',
+          '--page',
+          '1',
+          '-F',
+          'json',
+        )
+      ).stdout,
+    );
+    expect(result).toMatchObject({ total: 1, page: 1, size: 1, rows: [{ name: 'apple', v: 2 }] });
+    expect((await run(buildProgram(conn), 'get', 'items', '1', '-F', 'table')).stdout).toContain(
+      'apple',
+    );
+  });
+
+  it('delete 交互取消保留记录，确认后删除', async () => {
+    await conn.create('items', { name: 'keep', v: 1 });
+    vi.mocked(confirm).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    expect((await run(buildProgram(conn), 'delete', 'items', '1')).stdout).toContain('已取消');
+    expect((await conn.list('items')).total).toBe(1);
+    await run(buildProgram(conn), 'delete', 'items', '1');
+    expect((await conn.list('items')).total).toBe(0);
+  });
+
+  it('export 多页完整拉取，默认 CSV 可经 stdout 消费', async () => {
+    await conn.create('items', { name: 'a', v: 1 });
+    await conn.create('items', { name: 'b', v: 2 });
+    const output = (await run(buildProgram(conn), 'export', 'items', '--size', '1')).stdout;
+    expect(output).toContain('a');
+    expect(output).toContain('b');
+    expect(output.trim().split('\n')).toHaveLength(3);
+  });
+
+  it('import 单对象 JSON 与失败行继续导入，CSV 缺失单元格为空串', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const json = join(dir, 'one.json');
+      writeFileSync(json, JSON.stringify({ name: 'single', v: 1 }));
+      expect((await run(buildProgram(conn), 'import', 'items', json)).stdout).toContain('成功 1/1');
+      writeFileSync(json, JSON.stringify([{ unknown: true }, { name: 'next', v: 2 }]));
+      expect((await run(buildProgram(conn), 'import', 'items', json)).stdout).toContain('成功 1/2');
+      expect(error).toHaveBeenCalledWith(expect.stringContaining('行导入失败'));
+      const csv = join(dir, 'in.csv');
+      await run(buildProgram(conn), 'tables-create', 'csvstrings', '--fields', 'name,note');
+      writeFileSync(csv, 'name,note\nmissing');
+      expect((await run(buildProgram(conn), 'import', 'csvstrings', csv)).stdout).toContain(
+        '成功 1/1',
+      );
+      expect((await conn.list('csvstrings')).rows).toMatchObject([{ name: 'missing', note: '' }]);
+    } finally {
+      error.mockRestore();
+    }
+  });
+
+  it('无数据或损坏 JSON 更新失败时保留原记录', async () => {
+    await conn.create('items', { name: 'safe', v: 1 });
+    expect((await run(buildProgram(conn), 'update', 'items', '1')).code).toBe(1);
+    await expect(run(buildProgram(conn), 'update', 'items', '1', '-d', '{bad')).rejects.toThrow();
+    expect((await conn.get('items', 1)).name).toBe('safe');
+  });
+});

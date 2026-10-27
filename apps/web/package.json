@@ -1,8 +1,16 @@
 {
   "name": "@1api/web",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.1",
+  "private": false,
   "type": "module",
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit -p tsconfig.json && vite build",
@@ -32,5 +40,11 @@
     "vite": "^5.4.0",
     "vitest": "^3.0.0",
     "vue-tsc": "^2.1.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourtion/one-api.git",
+    "directory": "apps/web"
   }
 }

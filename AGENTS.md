@@ -14,12 +14,13 @@ one-api/
 │   ├── shared/   # @1api/shared —— 前后端共享类型 + 类型映射核心
 │   ├── engine/   # @1api/engine —— 纯逻辑数据引擎（无 HTTP/UI 概念）
 │   ├── sdk/      # @1api/sdk —— HTTP CRUD 客户端（基于 fetch，供程序化消费）
-│   └── cli/      # @1api/cli（命令名 one-api-cli）—— 终端工具（远程模式走 SDK + 本地直连模式走 engine）
-├── apps/         # server / web / docs（VitePress 文档站）
+│   ├── cli/      # @1api/cli（命令名 one-api-cli）—— 终端工具（远程模式走 SDK + 本地直连模式走 engine）
+│   └── serve/    # @1api/serve（命令名 1api）—— 一键启动分发薄壳（依赖 server，optionalDependencies web）
+├── apps/         # server（@1api/server，导出 createServer）/ web（@1api/web，静态产物包）/ docs（VitePress 文档站）
 └── docs/superpowers/{specs,plans}/
 ```
 
-**包依赖拓扑：** `shared` ← `engine` ← `server`/`web`/`sdk`/`cli`。`engine` 只接收 DB 句柄，不依赖任何传输层。
+**包依赖拓扑：** `shared` ← `engine` ← `server` ← `serve`；`web`（纯静态产物）← `serve`（optionalDependencies）；`sdk`/`cli` ← `engine`/`shared`。`engine` 只接收 DB 句柄，不依赖任何传输层。`server` 通过 `createServer()` 库函数被 `serve` 复用（`apps/server/src/index.ts` 有 `isMainEntry` 守卫，被 import 时只暴露库 API 不自动 run）。
 
 **分期进度：**
 - Phase 1（shared + engine）：✅ 已完成并合入 main
@@ -28,8 +29,9 @@ one-api/
 - Phase 4（MCP）：✅ 已完成并合入 main
 - Phase 5（SDK + CLI）：✅ 已完成并合入 main
 - Phase 6（生态分发）：✅ 已完成（npm 发包 @1api/shared/engine/sdk/cli @ 0.1.0 + VitePress 文档站 + erest 自动 API 文档）
+- Phase 7（一键启动分发）：代码与打包验收已完成（`@1api/serve` bin `1api` + server 库入口 + web 独立静态包），七包 `0.1.1` 已通过仓库外 Node 22.13 / 24 安装、Node 24 真实浏览器验收。npm 已有 `0.1.0`；按用户要求，本次不发布 `0.1.1`。
 
-设计依据见 `docs/superpowers/specs/2026-06-24-one-api-overview.md` + 各 phase spec。
+设计依据见 `docs/superpowers/specs/2026-06-24-one-api-overview.md` + 各 phase spec。处理稳定性修复、Phase 7 收尾及验收时，读 `docs/superpowers/specs/2026-10-23-reliability-and-phase7-completion.md` 与同名 `plans/` 文件。
 
 ## 2. 技术栈与硬约束
 
@@ -40,6 +42,7 @@ one-api/
 | 包管理 | pnpm workspace（`pnpm@9`，禁止 npm/yarn） |
 | Lint/Format | oxlint + oxfmt（全 workspace 统一） |
 | 测试 | Vitest 3，覆盖率门槛见下 |
+| Node.js | engine/server/serve/CLI：`^22.13.0 || >=24`，推荐 24；shared/SDK：18+（兼容浏览器） |
 | SQL | kysely（查询）+ better-sqlite3（原生反射/DDL） |
 | Web/API（server） | @leizm/web + **erest ^3.2**（`@erest/leizmweb` adapter + `createERest`），见 §4 |
 | 管理界面（web） | Vue 3.5 + Vite 5 + element-plus 2.11（全量注册）+ Pinia 2 + vue-router 4 + vue-json-ui-editor 3.0.1（数据编辑表单）+ axios 1。美学方向"Control Console"（翡翠青主色 + Manrope/JetBrains Mono） |
@@ -75,6 +78,9 @@ pnpm -r test        # 全 workspace 测试
 pnpm -r build       # 拓扑序构建：shared → engine → ...
 pnpm lint           # oxlint .
 pnpm format         # oxfmt --write .
+pnpm coverage       # 六个 core 包覆盖率门槛
+pnpm quality        # build + typecheck + test + test:release + coverage + lint
+pnpm release:preflight # 版本、包入口与 HTTP/CLI/MCP 版本身份检查；不发布
 ```
 
 **单包操作：**
@@ -88,7 +94,7 @@ pnpm --filter @1api/engine test src/__tests__/dynamic-sql.test.ts   # 单文件
 **Phase 3 起：单进程一键启动（API + 后台）：**
 
 ```bash
-pnpm -r build        # web 产物输出到 apps/server/static/admin/
+pnpm -r build        # web 产物输出到 apps/web/dist，server 自动探测
 pnpm start           # = node apps/server/dist/index.js，单进程同时提供 /api/* 和 /admin/* 后台
 # 浏览器打开 http://localhost:3000/admin/  （默认 admin/123456，首登强制改密）
 
@@ -98,6 +104,12 @@ pnpm --filter @1api/web dev      # 终端2：vite on :5173，/api 代理到 :300
 ```
 
 ## 4. 代码规范（项目特有）
+
+### 服务与分发生命周期
+
+- `createServer()` 仅装配句柄，`listen()` 启动；同一进程仅允许一个活动实例，第二次启动在建库前拒绝。`close()` 幂等且等待启动完成，关闭后用新句柄开始下一次生命周期；库不注册进程信号，bin 负责。
+- 健康检查位于 `/healthz`。`adminRoot` 为路径时显式托管、`null` 禁用、`undefined` 自动探测。serve 默认使用可选 web，缺失或未构建时警告并提供纯 API；`--no-web` 必须禁用。
+- 配置按 flag > env > 默认；显式数据库路径优先于 dataDir 派生路径。端口只接受 `0..65535` 整数（0 为随机端口），版本入口复用 `@1api/shared` 的 `ONE_API_VERSION`。
 
 ### 错误体系
 
@@ -214,12 +226,12 @@ Phase 5（SDK+CLI，依赖 Phase 1+2）
 | 坑 | 现象 | 对策 |
 |---|---|---|
 | **@leizm/web SPA fallback 不能用裸 `*`** | `app.router.get('/admin/*')` 注册即抛 `TypeError: Unexpected MODIFIER at N, expected END`（path-to-regexp v6 移除了裸星号）；`router.get('/admin/:splat*')` 又不匹配 `/admin/`（空 splat 段） | 用 `app.use('/admin', fallbackMiddleware)` —— use 是前缀匹配，覆盖 `/admin`、`/admin/`、`/admin/**` 全路径。fallback 中间件调 `ctx.response.file(indexHtml)`，放在 `serveStatic({index:false, fallthrough:true})` 之后（fallthrough 让未命中文件的请求 next 到 fallback）。见 `apps/server/src/app.ts`。 |
-| **静态根相对路径算错** | 生产 `node dist/index.js` 时 `import.meta.url` 解析到 `apps/server/dist/`，`resolvePath(here,'static/admin')` 算成 `dist/static/admin`（不存在）→ `/admin/` 404 | web 产物输出在 `apps/server/static/admin`（dist 上一级），默认根用 `resolvePath(here, '../static/admin')`；测试用 `ONE_API_ADMIN_ROOT` 环境变量注入精确路径绕过。 |
+| **静态根相对路径算错** | 曾因 `import.meta.url` 基于 dist 解析而定位到不存在的静态目录，导致 `/admin/` 404 | Phase 7 已改为 `apps/web/dist` 独立产物；server 按 env → 已安装 web 包 → 仓库 web/dist 探测，测试可显式注入 `adminRoot`。 |
 | **vue-json-ui-editor array items 支持** | spec §3.3「用途②」字段行编辑器：库 v3.0.1 不支持 `items:{type:object}` 可增删行；早期手搓 `FieldRowsEditor.vue`。后向库贡献 array-renderer 模块（`createArrayRenderer` + object 数组增删行 + 嵌套支持），one-api 已改用原生：TableNew 用 JsonEditor schema `{fields:{type:array,items:{type:object,properties:{name,label,jsonType,nullable}}}}` 渲染字段定义，删 `FieldRowsEditor.vue`。增删按钮注册为 el-button 圆形图标（arrayadd/arrayremove）。 |
 | **JsonEditor widget 由 `attrs.type` 决定** | parser.ts 把 `schema.attrs` 整体当 field，`field.type` 决定 widget；`format:'date-time'` parser 不识别（只认 email/uri/regex） | 自写 `schema-adapter.ts`（不复用 shared 的 `fieldsToJsonSchema`，那个无 attrs 扩展）：datetime→`attrs.type='date'`、boolean→`attrs.type='switch'`、string+enum→`attrs.type='select'`。先读 parser.ts 确认映射再写 adapter。 |
 | **新增表单系统字段阻塞 validate** | id/created_at/updated_at 出现在新增表单且 required（nullable=false），用户填不了 → el-form validate 失败、提交无反应 | `fieldsToEditorSchema(fields, {excludeSystem:true})` 新增模式跳过系统管理字段（自增主键/created_at/updated_at）；编辑模式系统字段 readOnly 展示。见 `lib/schema-adapter.ts`。 |
-| **engine 把 boolean/datetime 归一为 integer** | createModel 传 `jsonType:'boolean'`，meta 存回变 `integer`（SQLite 存 INTEGER，反射时 sqliteType→jsonType 反推） | 前端 boolean→switch / datetime→date-picker 分支是防御性代码（实际 meta 里这两类字段 jsonType 都是 integer → el-input-number）。不影响功能，知识：engine 的 jsonType 以 SQLite 存储类型为准。 |
-| **buildApp 内 erest api 是全局单例** | 多次调 buildApp（如每个测试用例各起一个 server）→ registerAuthRoutes 重复注册同名路由抛错 | 静态托管测试在 beforeAll 只 buildApp 一次、复用 server 跑全部用例。setupTest 用 `createERest` 创建新实例避免此问题。 |
+| **反射丢失逻辑类型（已修复）** | SQLite 物理类型无法反推出声明的 boolean/datetime，曾导致表单显示数值控件 | 建模、追加字段与刷新保留兼容的逻辑类型及字段元数据；物理类型改变时丢弃不兼容声明，导入既有表继续推断。 |
+| **buildApp 全局路由单例（已修复）** | 曾因多次 buildApp 重复注册路由而抛错，也会共享 session store | 每个 app 创建独立 erest 与 session store；数据库依赖仍为进程单例，因此 createServer 只允许一个活动实例。 |
 | **`@` alias 必须 vite/vitest/tsconfig 三处对齐** | 只在 vitest 配 `@`→src，vite 和 tsconfig 没配 → 测试过但 `vite build`/`vue-tsc` 找不到 `@/...` | vite.config.ts 的 resolve.alias + tsconfig.json 的 baseUrl/paths + vitest.config.ts 三处都配 `@`→src（见 apps/web Task 1 review 修复）。 |
 
 ## 附录：Phase 5 踩坑教训（勿重蹈）

@@ -1,6 +1,6 @@
 {
   "name": "@1api/engine",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -20,7 +20,7 @@
   "author": "Yourtion <yourtion@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourtion/one-api.git",
+    "url": "git+https://github.com/yourtion/one-api.git",
     "directory": "packages/engine"
   },
   "homepage": "https://github.com/yourtion/one-api#readme",
@@ -39,7 +39,7 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=18"
+    "node": "^22.13.0 || >=24"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

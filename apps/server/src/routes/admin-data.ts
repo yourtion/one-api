@@ -1,5 +1,5 @@
 import { z } from 'erest';
-import { Errors } from '@1api/shared';
+import { Errors, MAX_SIZE } from '@1api/shared';
 import { getEngine } from '../core/engine.js';
 import { parseListQuery } from '../utils/list-query.js';
 import { requireAdmin } from '../hooks.js';
@@ -39,13 +39,21 @@ export function registerAdminDataRoutes(api: AppApi): void {
       // erest 提供的公开逃生舱（erest v3.2.1+）。
       const EXPORT_SIZE_LIMIT = 10000;
       const id = req.params.id;
-      const name = await resolveName(id);
-      const listOpts = parseListQuery(req.query as Record<string, unknown>);
-      const result = await engine().data.list(name, { ...listOpts, page: 1, size: EXPORT_SIZE_LIMIT }, INTERNAL);
       const meta = await engine().metadata.getMeta(id);
-      const cols = (meta?.fields ?? []).map((f) => f.name);
-      const header = cols.join(',');
+      if (!meta) throw Errors.tableNotFound(String(id));
+      const name = meta.name;
+      const listOpts = parseListQuery(req.query as Record<string, unknown>);
+      // 复用普通列表的校验和过滤；分页读取以保留 engine 的单页上限。
+      const result = await engine().data.list(name, { ...listOpts, page: 1, size: MAX_SIZE }, INTERNAL);
+      const cols = meta.fields.map((f) => f.name);
+      const header = cols.map(csvCell).join(',');
       const lines = result.rows.map((r) => cols.map((c) => csvCell(r[c])).join(','));
+      const rowLimit = Math.min(result.total, EXPORT_SIZE_LIMIT);
+      for (let page = 2; lines.length < rowLimit; page++) {
+        const next = await engine().data.list(name, { ...listOpts, page, size: MAX_SIZE }, INTERNAL);
+        if (next.rows.length === 0) break;
+        lines.push(...next.rows.slice(0, rowLimit - lines.length).map((r) => cols.map((c) => csvCell(r[c])).join(',')));
+      }
       // I5: 超出导出上限时用响应头提示（CSV body 不能改），避免静默截断误导管理员
       if (result.total > EXPORT_SIZE_LIMIT) {
         ctx.reply.raw.response.setHeader('X-Export-Truncated', 'true');
@@ -96,5 +104,5 @@ export function registerAdminDataRoutes(api: AppApi): void {
 function csvCell(v: unknown): string {
   if (v === null || v === undefined) return '';
   const s = String(v);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }

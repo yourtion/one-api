@@ -17,9 +17,25 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       // core 逻辑计入门槛；装配/入口层（app.ts/index.ts/config，含启动副作用，非纯逻辑）排除
-      include: ['src/routes/**', 'src/middlewares/**', 'src/utils/**', 'src/db/**', 'src/core/**', 'src/api/**', 'src/modules/mcp/**'],
+      include: [
+        'src/routes/**',
+        'src/middlewares/**',
+        'src/utils/**',
+        'src/db/**',
+        'src/core/**',
+        'src/api/**',
+        'src/modules/mcp/**',
+        'src/server.ts',
+        'src/hooks.ts',
+      ],
       // 纯声明式文件（zod schema 定义、McpServer 装配）无逻辑分支，v8 把 import 语句当未覆盖分支造成噪声，排除
-      exclude: ['src/__tests__/**', 'src/types.ts', 'src/db/types.ts', 'src/modules/mcp/schemas.ts', 'src/modules/mcp/server.ts'],
+      exclude: [
+        'src/__tests__/**',
+        'src/types.ts',
+        'src/db/types.ts',
+        'src/modules/mcp/schemas.ts',
+        'src/modules/mcp/server.ts',
+      ],
       thresholds: {
         lines: 90,
         branches: 85,

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadConfig, saveConfig, resolveConfigPath, resolveConnectOptions } from '../config.js';
 
@@ -84,5 +84,33 @@ describe('resolveConnectOptions 合并（flag > file）', () => {
 
   it('部分 flag（只有 host）→ null（缺 token）', () => {
     expect(resolveConnectOptions({ host: 'http://x' })).toBeNull();
+  });
+});
+
+describe('配置缺省与损坏恢复', () => {
+  it('HOME 未定义时使用系统 home', () => {
+    delete process.env.HOME;
+    expect(resolveConfigPath()).toBe(join(homedir(), '.one-api-cli', 'config.json'));
+  });
+
+  it('配置 JSON 损坏时允许重新 connect', () => {
+    saveConfig({ mode: 'local', dbPath: '/tmp/old.db' });
+    writeFileSync(resolveConfigPath(), '{bad json');
+    expect(loadConfig()).toBeNull();
+    expect(resolveConnectOptions({ host: 'http://new', token: 'new' })).toEqual({
+      mode: 'remote',
+      host: 'http://new',
+      token: 'new',
+    });
+  });
+
+  it.each([undefined, '/tmp/system.db'])('文件中的本地配置保留系统库路径 %s', (systemDbPath) => {
+    const cfg: { mode: 'local'; dbPath: string; systemDbPath?: string } = {
+      mode: 'local',
+      dbPath: '/tmp/biz.db',
+    };
+    if (systemDbPath) cfg.systemDbPath = systemDbPath;
+    saveConfig(cfg);
+    expect(resolveConnectOptions({})).toEqual(cfg);
   });
 });

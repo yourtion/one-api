@@ -63,4 +63,9 @@ describe('Errors 工厂', () => {
     expect(e.code).toBe('UNAUTHORIZED');
     expect(e.statusCode).toBe(401);
   });
+  it('authPasswordChangeRequired → 403 AUTH_PASSWORD_CHANGE_REQUIRED', () => {
+    const e = Errors.authPasswordChangeRequired();
+    expect(e.code).toBe('AUTH_PASSWORD_CHANGE_REQUIRED');
+    expect(e.statusCode).toBe(403);
+  });
 });

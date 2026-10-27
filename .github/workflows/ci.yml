@@ -19,6 +19,9 @@ concurrency:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ['22.13.0', '24']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,14 +32,11 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Lint
-        run: pnpm lint
 
       # typecheck 前必须先 build：engine 的 tsconfig project reference 依赖 shared/dist
       - name: Build
@@ -48,3 +48,15 @@ jobs:
       # test 无需 build 前置：各包 vitest.config.ts 已配 resolve.alias 直走源码
       - name: Test
         run: pnpm -r test
+
+      - name: Release contract and Trusted Publishing helper tests
+        run: pnpm test:release
+
+      - name: Core coverage
+        run: pnpm coverage
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Release preflight
+        run: pnpm release:preflight

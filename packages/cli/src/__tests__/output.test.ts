@@ -41,7 +41,10 @@ describe('renderCsv', () => {
   });
 
   it('null/undefined → 空字符串', () => {
-    const out = renderCsv([{ a: null, b: undefined } as unknown as Record<string, unknown>], ['a', 'b']);
+    const out = renderCsv(
+      [{ a: null, b: undefined } as unknown as Record<string, unknown>],
+      ['a', 'b'],
+    );
     expect(out.split('\n')[1]).toBe(',');
   });
 });
@@ -62,4 +65,16 @@ describe('renderTable', () => {
     const headerLine = out.split('\n').find((l) => l.includes('name') && l.includes('id'))!;
     expect(headerLine.indexOf('name')).toBeLessThan(headerLine.indexOf('id'));
   });
+});
+
+it('空结果表格与复合、空值单元格可读', () => {
+  expect(renderTable([], ['id'])).toBe('(无数据)');
+  const out = renderTable(
+    [{ object: { x: 1 }, empty: null, missing: undefined }],
+    ['object', 'empty', 'missing'],
+  );
+  expect(out).toContain('{"x":1}');
+  expect(out).not.toContain('null');
+  expect(out).not.toContain('undefined');
+  expect(renderCsv([{ object: { x: 1 }, line: 'a\nb' }], ['object', 'line'])).toContain('"a\nb"');
 });

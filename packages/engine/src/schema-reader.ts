@@ -92,19 +92,20 @@ export function readTableSchema(
   return { fields, primaryKey: pkField };
 }
 
-/** 解析 PRAGMA 的 dflt_value 字符串为合适的 JS 值 */
+/** 解析默认值字面量；SQL 表达式保留原文，由 SQLite 在插入时求值。 */
 function parseDefaultValue(raw: string | null, jsonType: JsonType): unknown {
   if (raw === null) return null;
-  const v = raw;
-  if (jsonType === 'boolean') return v === '1' ? true : v === '0' ? false : null;
-  if (jsonType === 'integer') {
-    const n = Number.parseInt(v, 10);
-    return Number.isFinite(n) ? n : null;
+  const v = raw.trim();
+  let literal = v;
+  while (literal.startsWith('(') && literal.endsWith(')')) {
+    literal = literal.slice(1, -1).trim();
   }
-  if (jsonType === 'number') {
-    const n = Number.parseFloat(v);
-    return Number.isFinite(n) ? n : null;
+  if (/^NULL$/i.test(literal)) return null;
+  if (jsonType === 'boolean') return v === '1' ? true : v === '0' ? false : raw;
+  if (jsonType === 'integer' || jsonType === 'number') {
+    const n = Number(v);
+    return v !== '' && Number.isFinite(n) ? n : raw;
   }
-  // string / datetime：去掉外层单引号（SQLite 默认值字符串以 'xxx' 形式存储）
-  return v.replace(/^'|'$/g, '').replace(/''/g, "'");
+  // 仅对完整的单引号字符串字面量去引号；拼接等 SQL 表达式保持原样。
+  return /^'(?:[^']|'')*'$/.test(v) ? v.slice(1, -1).replace(/''/g, "'") : raw;
 }

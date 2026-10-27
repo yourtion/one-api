@@ -4,15 +4,17 @@
 
 ## 1. 启动服务
 
+使用 Node.js `^22.13.0 || >=24`，推荐 Node.js 24。当前 `0.1.1` 修复版仅准备代码和打包验收，尚未发布；npx 获取注册表已有版本。
+
 ```bash
-git clone https://github.com/yourtion/one-api.git
-cd one-api
-pnpm install
-pnpm -r build
-pnpm start
+npx @1api/serve
 ```
 
-`pnpm start` 等价于 `node apps/server/dist/index.js`——**单进程**同时提供 `/api/*` 数据接口和 `/admin` 管理界面。默认监听 `http://localhost:3000`。
+无需 clone 仓库。`npx @1api/serve` 一个进程同时提供 `/api/*` 数据接口、`/admin` 管理界面和 `/mcp` 服务。默认监听 `http://localhost:3000`，健康检查位于 `/healthz`。管理界面依赖可选的 `@1api/web`；缺失时警告并以纯 API 模式启动，安装选项见 [安装与部署](./install)。
+
+::: tip 全局安装后可省略 npx
+`npm install -g @1api/serve` 之后直接用 `1api` 命令。启动选项见 [安装与部署](./install)。
+:::
 
 ## 2. 打开管理界面
 

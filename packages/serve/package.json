@@ -1,0 +1,46 @@
+{
+  "name": "@1api/serve",
+  "version": "0.1.1",
+  "private": false,
+  "type": "module",
+  "description": "one-api 一键启动服务（带可选 web 管理界面）",
+  "bin": {
+    "1api": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@1api/server": "workspace:*"
+  },
+  "optionalDependencies": {
+    "@1api/web": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^3",
+    "typescript": "^5.8.0",
+    "vitest": "^3.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": "^22.13.0 || >=24"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourtion/one-api.git",
+    "directory": "packages/serve"
+  }
+}
